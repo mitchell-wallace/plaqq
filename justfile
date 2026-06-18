@@ -1,4 +1,7 @@
-version := shell("git describe --tags --always --dirty 2>/dev/null || echo dev")
+# Local dev version: the VERSION file's release as a base, marked as a dev build
+# with the short commit hash (e.g. 0.3.0-dev+1a06be9, plus .dirty when the tree
+# has uncommitted changes). Release binaries are versioned by goreleaser instead.
+version := shell('base="$(tr -d "[:space:]" < VERSION 2>/dev/null || echo 0.0.0)"; hash="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"; dirty=""; [ -n "$(git status --porcelain 2>/dev/null)" ] && dirty=".dirty"; printf "%s-dev+%s%s" "$base" "$hash" "$dirty"')
 gopath := shell("go env GOPATH")
 
 default: build
@@ -24,9 +27,14 @@ clean:
 run *args:
 	go run -ldflags "-X main.version={{version}}" ./cmd/plaqq {{args}}
 
-# Install the plaqq binary locally to ~/.local/bin
+# Install the plaqq binary locally to ~/.local/bin.
+# Copy to a temp file in the same dir, then atomically rename over the target so
+# the install succeeds even while an old plaqq is still running (avoids the
+# "text file busy" error from overwriting an in-use binary in place).
 install: build
 	mkdir -p ~/.local/bin
-	cp bin/plaqq ~/.local/bin/plaqq
+	cp bin/plaqq ~/.local/bin/.plaqq.new
+	chmod +x ~/.local/bin/.plaqq.new
+	mv -f ~/.local/bin/.plaqq.new ~/.local/bin/plaqq
 
 

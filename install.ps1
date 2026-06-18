@@ -36,8 +36,32 @@ Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempFile -UseBasicParsing
 # Create install directory
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
-# Extract
-Expand-Archive -Path $TempFile -DestinationPath $InstallDir -Force
+# Extract to a temp dir first, then move the binary into place. Windows won't let
+# you overwrite or delete a running .exe, but it will let you rename it aside, so
+# if plaqq is currently running we move the old exe to plaqq.old.exe before
+# dropping the new one in -- the install succeeds without killing the process.
+$TempExtract = Join-Path $env:TEMP ("plaqq_extract_" + [System.Guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Force -Path $TempExtract | Out-Null
+Expand-Archive -Path $TempFile -DestinationPath $TempExtract -Force
+
+$TargetExe = Join-Path $InstallDir "plaqq.exe"
+if (Test-Path $TargetExe) {
+    $OldExe = Join-Path $InstallDir "plaqq.old.exe"
+    Remove-Item -Path $OldExe -Force -ErrorAction SilentlyContinue
+    try {
+        Move-Item -Path $TargetExe -Destination $OldExe -Force
+    } catch {
+        Write-Error "Could not replace $TargetExe (is plaqq running?). Close all plaqq windows and retry."
+        exit 1
+    }
+}
+
+# Move extracted files into the install dir (plaqq.exe plus any extras)
+Get-ChildItem -Path $TempExtract | ForEach-Object {
+    Move-Item -Path $_.FullName -Destination (Join-Path $InstallDir $_.Name) -Force
+}
+
+Remove-Item -Path $TempExtract -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item -Path $TempFile -Force
 
 Write-Host "Installed plaqq.exe to $InstallDir"

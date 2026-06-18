@@ -49,9 +49,17 @@ curl -fsSL "$DOWNLOAD_URL" -o "/tmp/${ASSET}"
 # Create install directory
 mkdir -p "$INSTALL_DIR"
 
-# Extract binary
-tar -xzf "/tmp/${ASSET}" -C "$INSTALL_DIR" plaqq
-chmod +x "$INSTALL_DIR/plaqq"
+# Extract to a temp file in the install dir, then atomically rename it over the
+# target. The temp must live on the same filesystem as the target so the move is
+# a rename (not a copy), which replaces the directory entry without truncating
+# the in-use inode -- this lets the install succeed even while an old plaqq is
+# still running (otherwise overwriting it fails with "text file busy").
+TMP_BIN="$(mktemp "${INSTALL_DIR}/.plaqq.XXXXXX")"
+trap 'rm -f "$TMP_BIN" "/tmp/${ASSET}"' EXIT
+tar -xzOf "/tmp/${ASSET}" plaqq > "$TMP_BIN"
+chmod +x "$TMP_BIN"
+mv -f "$TMP_BIN" "$INSTALL_DIR/plaqq"
+trap - EXIT
 rm -f "/tmp/${ASSET}"
 
 echo "Installed plaqq to ${INSTALL_DIR}/plaqq"

@@ -31,55 +31,60 @@ var updateCmd = &cobra.Command{
 Prints the current and latest versions. If a newer version is available,
 prompts for confirmation before running the install script unless --yes is set.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if version == "" || version == "dev" {
-			if jsonOutput {
-				printJSON(map[string]any{
-					"currentVersion": "dev",
-					"error":          "cannot check for updates",
-				})
-			} else {
-				fmt.Println("Current version: dev (cannot check for updates)")
-			}
-			return
-		}
-
 		latest, err := fetchLatestVersionFunc()
 		if err != nil {
 			exit(2, "update: %v", err)
 		}
 
-		cmp, err := compareVersions(version, latest)
-		if err != nil {
-			exit(2, "update: %v", err)
+		// A non-release version (empty, "dev", a bare git build hash, or a
+		// "-dev" local build) can't be compared against the latest release.
+		// Rather than failing, treat it as eligible for installing the latest
+		// release so `plaqq update` is useful from a locally built binary.
+		dev := !isReleaseVersion(version)
+		current := version
+		if current == "" {
+			current = "dev"
 		}
 
-		if cmp >= 0 {
-			if jsonOutput {
-				printJSON(map[string]any{
-					"currentVersion": version,
-					"latestVersion":  latest,
-					"upToDate":       true,
-					"updated":        false,
-				})
-			} else {
-				fmt.Printf("Current version: %s\nLatest version:  %s\n", version, latest)
-				fmt.Println("You are up to date.")
+		if !dev {
+			cmp, err := compareVersions(version, latest)
+			if err != nil {
+				exit(2, "update: %v", err)
 			}
-			return
+			if cmp >= 0 {
+				if jsonOutput {
+					printJSON(map[string]any{
+						"currentVersion": current,
+						"latestVersion":  latest,
+						"upToDate":       true,
+						"updated":        false,
+					})
+				} else {
+					fmt.Printf("Current version: %s\nLatest version:  %s\n", current, latest)
+					fmt.Println("You are up to date.")
+				}
+				return
+			}
 		}
 
 		if !updateYes {
 			if jsonOutput {
 				printJSON(map[string]any{
-					"currentVersion": version,
+					"currentVersion": current,
 					"latestVersion":  latest,
+					"devBuild":       dev,
 					"upToDate":       false,
 					"updated":        false,
 				})
 				return
 			}
-			fmt.Printf("Current version: %s\nLatest version:  %s\n", version, latest)
-			fmt.Print("Update to latest version? [Y/n] ")
+			fmt.Printf("Current version: %s\nLatest version:  %s\n", current, latest)
+			prompt := "Update to latest version? [Y/n] "
+			if dev {
+				fmt.Println("You are running a development build.")
+				prompt = "Install the latest release? [Y/n] "
+			}
+			fmt.Print(prompt)
 			reader := bufio.NewReader(os.Stdin)
 			response, err := reader.ReadString('\n')
 			if err != nil {
@@ -91,7 +96,7 @@ prompts for confirmation before running the install script unless --yes is set.`
 				return
 			}
 		} else if !jsonOutput {
-			fmt.Printf("Current version: %s\nLatest version:  %s\n", version, latest)
+			fmt.Printf("Current version: %s\nLatest version:  %s\n", current, latest)
 		}
 
 		if err := installLatestVersionFn(); err != nil {
@@ -99,8 +104,9 @@ prompts for confirmation before running the install script unless --yes is set.`
 		}
 		if jsonOutput {
 			printJSON(map[string]any{
-				"currentVersion": version,
+				"currentVersion": current,
 				"latestVersion":  latest,
+				"devBuild":       dev,
 				"upToDate":       false,
 				"updated":        true,
 			})
@@ -160,6 +166,28 @@ func installLatestVersion() error {
 	installCmd.Stdout = os.Stdout
 	installCmd.Stderr = os.Stderr
 	return installCmd.Run()
+}
+
+// isReleaseVersion reports whether v is a clean release version of the form
+// X.Y.Z (an optional leading "v" is allowed). Development builds — the empty
+// string, "dev", a bare git build hash, or anything carrying a pre-release or
+// build suffix (e.g. "0.3.0-dev+1a06be9", "0.3.0-5-g1a06be9-dirty") — return
+// false, since they cannot be meaningfully compared against a release tag.
+func isReleaseVersion(v string) bool {
+	v = strings.TrimPrefix(v, "v")
+	parts := strings.Split(v, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	for _, p := range parts {
+		if p == "" {
+			return false
+		}
+		if _, err := strconv.Atoi(p); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func compareVersions(a, b string) (int, error) {

@@ -170,7 +170,7 @@ in the config file (see 'plaqq config'). Flags override the config file.`,
 
 		// Start update check in background
 		updateNoticeChan := make(chan string, 1)
-		if !jsonOutput && version != "" && version != "dev" {
+		if !jsonOutput && isReleaseVersion(version) {
 			go func() {
 				client := &http.Client{Timeout: 2 * time.Second}
 				req, err := http.NewRequest("GET", "https://api.github.com/repos/mitchell-wallace/plaqq/releases/latest", nil)
