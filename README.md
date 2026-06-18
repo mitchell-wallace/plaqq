@@ -64,6 +64,34 @@ The notice appearance can be customized with flags (run `plaqq -h` to see them a
     plaqq --no-hint "stand clear"
     ```
 
+### Persistent Configuration
+
+Rather than passing flags every time, you can set styling defaults in a TOML config file. The resolution order is **built-in defaults → config file → CLI flags**, so a flag always wins over the config file.
+
+The file lives at `$XDG_CONFIG_HOME/plaqq/config.toml` (typically `~/.config/plaqq/config.toml` on Linux, `~/Library/Application Support/plaqq/config.toml` on macOS), or wherever the `PLAQQ_CONFIG` environment variable points.
+
+```bash
+plaqq config path   # print the resolved config path
+plaqq config init   # write a commented template to that path
+```
+
+A config file looks like:
+
+```toml
+color = "#ff5f87"
+bold = true
+hint = "press space"
+no_hint = false
+```
+
+### Message History
+
+`plaqq` displays the notice on the alternate screen, which is torn down on dismissal. To keep a record in your scrollback, the notice text is echoed to stdout after closing:
+
+```
+message: "remember to run e2e tests before pushing"
+```
+
 ### Options & Subcommands
 
 *   **`version`**: Prints the current version.

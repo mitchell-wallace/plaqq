@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mitchell-wallace/plaqq/internal/config"
 	"github.com/mitchell-wallace/plaqq/internal/font"
 	"github.com/spf13/cobra"
 )
@@ -72,6 +73,49 @@ func isHexDigit(r rune) bool {
 	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')
 }
 
+// resolveStyle determines the effective notice styling by layering, in order:
+// built-in defaults, values from the config file, then any CLI flags the user
+// explicitly set (so a flag always wins over the config file).
+func resolveStyle(cmd *cobra.Command) (color string, bold bool, hint string, noHint bool, err error) {
+	color, bold, hint, noHint = "", true, defaultHint, false
+
+	path, err := config.Path()
+	if err != nil {
+		return "", false, "", false, err
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		return "", false, "", false, err
+	}
+	if cfg.Color != nil {
+		color = *cfg.Color
+	}
+	if cfg.Bold != nil {
+		bold = *cfg.Bold
+	}
+	if cfg.Hint != nil {
+		hint = *cfg.Hint
+	}
+	if cfg.NoHint != nil {
+		noHint = *cfg.NoHint
+	}
+
+	if cmd.Flags().Changed("color") {
+		color = flagColor
+	}
+	if cmd.Flags().Changed("bold") {
+		bold = flagBold
+	}
+	if cmd.Flags().Changed("hint") {
+		hint = flagHint
+	}
+	if cmd.Flags().Changed("no-hint") {
+		noHint = flagNoHint
+	}
+
+	return color, bold, hint, noHint, nil
+}
+
 var rootCmd = &cobra.Command{
 	Use:   "plaqq [message]",
 	Short: "plaqq displays a notice across the terminal pane in chunky letters",
@@ -79,7 +123,8 @@ var rootCmd = &cobra.Command{
 on the terminal. It waits for the user to press the spacebar to dismiss the notice.
 
 The notice color, bold weight, and dismiss hint can be customized with the
---color, --bold, --hint, and --no-hint flags.`,
+--color, --bold, --hint, and --no-hint flags, or set as persistent defaults
+in the config file (see 'plaqq config'). Flags override the config file.`,
 	Example: `  plaqq "deploy starting"
   plaqq --color "#ff5f87" "build failed"
   plaqq --color 213 --bold=false "heads up"
@@ -89,9 +134,15 @@ The notice color, bold weight, and dismiss hint can be customized with the
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Resolve styling with precedence: built-in defaults < config file < CLI flags.
+		colorStr, bold, hint, noHint, err := resolveStyle(cmd)
+		if err != nil {
+			return err
+		}
+
 		var noticeColor lipgloss.TerminalColor = lipgloss.AdaptiveColor{Light: "#00d7af", Dark: "#00f5d4"}
-		if flagColor != "" {
-			c, err := parseColor(flagColor)
+		if colorStr != "" {
+			c, err := parseColor(colorStr)
 			if err != nil {
 				return err
 			}
@@ -154,11 +205,15 @@ The notice color, bold weight, and dismiss hint can be customized with the
 		}
 
 		// Initialize Bubble Tea program
-		m := initialModel(noticeMsg, noticeColor, flagBold, flagHint, !flagNoHint)
+		m := initialModel(noticeMsg, noticeColor, bold, hint, !noHint)
 		p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithoutCatchPanics())
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("run program: %w", err)
 		}
+
+		// Echo the message to scrollback so it survives after the alt-screen
+		// is torn down (otherwise an interactively entered notice leaves no trace).
+		fmt.Printf("message: %q\n", noticeMsg)
 
 		// Print update notice if one was detected
 		select {
