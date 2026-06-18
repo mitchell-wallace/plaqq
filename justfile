@@ -24,3 +24,9 @@ clean:
 run *args:
 	go run -ldflags "-X main.version={{version}}" ./cmd/plaqq {{args}}
 
+# Install the plaqq binary locally to ~/.local/bin
+install: build
+	mkdir -p ~/.local/bin
+	cp bin/plaqq ~/.local/bin/plaqq
+
+

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mitchell-wallace/plaqq/internal/font"
 	"github.com/spf13/cobra"
@@ -32,10 +33,23 @@ on the terminal. It waits for the user to press the spacebar to dismiss the noti
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Default notice message if none is provided
-		noticeMsg := "REMEMBER TO RUN E2E TESTS BEFORE PUSHING"
+		var noticeMsg string
 		if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
 			noticeMsg = args[0]
+		} else {
+			err := huh.NewInput().
+				Title("Enter notice message").
+				Placeholder("e.g. remember to run e2e tests before pushing").
+				Value(&noticeMsg).
+				Run()
+			if err != nil {
+				// Exit cleanly on abort
+				return nil
+			}
+			noticeMsg = strings.TrimSpace(noticeMsg)
+			if noticeMsg == "" {
+				return fmt.Errorf("a message is required")
+			}
 		}
 
 		// Start update check in background
