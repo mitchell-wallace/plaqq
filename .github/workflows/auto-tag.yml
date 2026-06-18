@@ -15,12 +15,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Check VERSION change, create tag, and dispatch release
         run: |
-          if git diff HEAD~1 --quiet -- VERSION; then
-            echo "VERSION file unchanged, skipping."
+          # Compare against the commit the branch pointed at before this push so a
+          # VERSION bump is detected even when it isn't the most recent commit in
+          # a multi-commit push. Fall back to HEAD~1 for a brand-new branch (the
+          # "before" SHA is all-zeros or not fetched).
+          base="${BEFORE}"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base="HEAD~1"
+          fi
+
+          if git diff --quiet "$base" HEAD -- VERSION; then
+            echo "VERSION file unchanged since $base, skipping."
             exit 0
           fi
 
@@ -49,3 +58,4 @@ jobs:
             --field ref="$VERSION"
         env:
           GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
