@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -14,6 +16,7 @@ import (
 // value be distinguished from an explicit zero value (e.g. bold = false).
 type Config struct {
 	Color  *string `toml:"color"`
+	Font   *string `toml:"font"`
 	Bold   *bool   `toml:"bold"`
 	Hint   *string `toml:"hint"`
 	NoHint *bool   `toml:"no_hint"`
@@ -22,10 +25,17 @@ type Config struct {
 // Template is a commented config file with every option shown at its default.
 const Template = `# plaqq configuration
 # Styling defaults for the notice. CLI flags override anything set here.
+# Tip: run 'plaqq config' (no subcommand) for an interactive editor.
 
-# Notice text color: a hex code (e.g. "#00f5d4") or an ANSI index ("0"-"255").
-# Defaults to an adaptive teal that suits both light and dark terminals.
-# color = "#00f5d4"
+# Notice text color: a preset name ("teal", "coral", "amber", "lime", "azure",
+# "violet", "magenta", "rose", "crimson", "slate"), a hex code (e.g. "#00f5d4"),
+# or an ANSI index ("0"-"255"). Defaults to an adaptive teal.
+# color = "teal"
+
+# Font used to render the notice. Block fonts: "block" (default), "heavy",
+# "compact". FIGlet fonts: "standard", "slant", "banner", "big", "small",
+# "doom", "larry3d", "mini", "cyberlarge".
+# font = "block"
 
 # Render the notice text in bold.
 # bold = true
@@ -80,4 +90,35 @@ func WriteTemplate(path string) error {
 		return err
 	}
 	return os.WriteFile(path, []byte(Template), 0o644)
+}
+
+// Save writes cfg to path as TOML, overwriting any existing file and creating
+// parent directories as needed. Only fields that are set (non-nil) are written,
+// so an unset option falls through to plaqq's built-in default on load. This is
+// what the interactive editor ('plaqq config') uses to persist choices.
+func Save(path string, cfg *Config) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+
+	var b strings.Builder
+	b.WriteString("# plaqq configuration — managed by 'plaqq config'.\n")
+	b.WriteString("# Edit by hand or re-run 'plaqq config'. CLI flags override these.\n\n")
+	if cfg.Color != nil {
+		fmt.Fprintf(&b, "color = %s\n", strconv.Quote(*cfg.Color))
+	}
+	if cfg.Font != nil {
+		fmt.Fprintf(&b, "font = %s\n", strconv.Quote(*cfg.Font))
+	}
+	if cfg.Bold != nil {
+		fmt.Fprintf(&b, "bold = %t\n", *cfg.Bold)
+	}
+	if cfg.Hint != nil {
+		fmt.Fprintf(&b, "hint = %s\n", strconv.Quote(*cfg.Hint))
+	}
+	if cfg.NoHint != nil {
+		fmt.Fprintf(&b, "no_hint = %t\n", *cfg.NoHint)
+	}
+
+	return os.WriteFile(path, []byte(b.String()), 0o644)
 }

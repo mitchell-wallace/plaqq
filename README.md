@@ -8,7 +8,9 @@ It takes any custom notice text, renders it in a centered, chunky ASCII block fo
 
 ## Features
 
-- **Large Chunky Block Font**: Renders notices using beautiful high-contrast unicode block characters (`█`, `▄`, `▀`).
+- **Multiple Fonts**: Ships Unicode block faces (`block`, `heavy`, `compact`) plus a curated set of FIGlet ASCII faces (`standard`, `slant`, `banner`, `big`, `small`, `doom`, `larry3d`, `mini`, `cyberlarge`).
+- **Color Presets**: Pick a named color (`teal`, `coral`, `amber`, `lime`, `azure`, `violet`, `magenta`, `rose`, `crimson`, `slate`) or supply your own hex / ANSI value.
+- **Interactive Config Picker**: Run `plaqq config` (no subcommand) to edit your styling defaults in a friendly form.
 - **Dynamic Centering & Word Wrapping**: Automatically wraps text to fit within your terminal pane margin and keeps the notice perfectly centered vertically and horizontally.
 - **Adaptive Theme Styling**: Looks great on both light and dark terminals using adaptive theme styling.
 - **Spacebar Dismissal**: Dismiss the overlay instantly by pressing `Space`.
@@ -49,8 +51,14 @@ plaqq "remember to run e2e tests before pushing"
 
 The notice appearance can be customized with flags (run `plaqq -h` to see them all):
 
-*   **`--color`**: Notice text color as a hex code (`#00f5d4`) or ANSI index (`0`-`255`). Defaults to an adaptive teal that suits both light and dark terminals.
+*   **`--font`**: Font used to render the notice. Block faces: `block` (default), `heavy`, `compact`. FIGlet ASCII faces: `standard`, `slant`, `banner`, `big`, `small`, `doom`, `larry3d`, `mini`, `cyberlarge`.
     ```bash
+    plaqq --font heavy "shipped"
+    plaqq --font slant "heads up"
+    ```
+*   **`--color`**: Notice text color as a preset name (`teal`, `coral`, `amber`, `lime`, `azure`, `violet`, `magenta`, `rose`, `crimson`, `slate`), a hex code (`#00f5d4`), or an ANSI index (`0`-`255`). Defaults to an adaptive teal that suits both light and dark terminals.
+    ```bash
+    plaqq --color coral "build failed"
     plaqq --color "#ff5f87" "build failed"
     plaqq --color 213 "heads up"
     ```
@@ -68,17 +76,21 @@ The notice appearance can be customized with flags (run `plaqq -h` to see them a
 
 Rather than passing flags every time, you can set styling defaults in a TOML config file. The resolution order is **built-in defaults → config file → CLI flags**, so a flag always wins over the config file.
 
-The file lives at `$XDG_CONFIG_HOME/plaqq/config.toml` (typically `~/.config/plaqq/config.toml` on Linux, `~/Library/Application Support/plaqq/config.toml` on macOS), or wherever the `PLAQQ_CONFIG` environment variable points.
+The easiest way to manage it is the interactive picker — run `plaqq config` with no subcommand to navigate the font, color, bold, and hint options in a form and save your choices:
 
 ```bash
+plaqq config        # interactive editor (navigate options, then save)
 plaqq config path   # print the resolved config path
 plaqq config init   # write a commented template to that path
 ```
 
+The file lives at `$XDG_CONFIG_HOME/plaqq/config.toml` (typically `~/.config/plaqq/config.toml` on Linux, `~/Library/Application Support/plaqq/config.toml` on macOS), or wherever the `PLAQQ_CONFIG` environment variable points.
+
 A config file looks like:
 
 ```toml
-color = "#ff5f87"
+color = "coral"
+font = "heavy"
 bold = true
 hint = "press space"
 no_hint = false

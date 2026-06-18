@@ -10,7 +10,9 @@ This document describes the mechanics, design guidelines, and automation rules f
 - **Primary Layout Files**:
   - `cmd/plaqq/main.go`: Entry point setting the version variable and invoking Cobra.
   - `internal/cmd/root.go`: Main interactive app using Bubble Tea. Runs in alternate screen buffer and handles key/window resize events.
-  - `internal/font/font.go`: Defines the 5-row custom chunky block font glyphs and word-wrapping routines.
+  - `internal/cmd/styles.go`: Named color presets and lookup.
+  - `internal/cmd/config.go`: `config` command, including the interactive `huh`-based picker for bare `plaqq config`.
+  - `internal/font/`: Font subsystem. `registry.go` defines the `Font` interface plus `Get`/`Names`/`Wrap`; `font.go` holds the default 5-row block glyphs; `block.go` is a generic glyph-table font; `compact.go` is a hand-authored 3-row block font; `figlet.go` wraps go-figure FIGlet fonts (and derives the `heavy` block font from banner3).
   - `internal/cmd/update.go`: Implements the `update` command checking GitHub releases and triggering update scripts.
 
 ---
@@ -28,7 +30,10 @@ To release a new version of `plaqq`:
 
 ## 🎨 Layout & Font Architecture
 
-- **Chunky Block Glyph Set**: Standard block unicode elements (`█`, `▄`, `▀`) are mapped in a `map[rune][5]string` array.
-- **Word Wrapping**: Handled in `font.WrapText`. Calculates maximum columns allowed (terminal width - 8) and dynamically wraps lines to avoid clipping.
-- **Color Theme**: Adaptive teal (`#00f5d4` on dark terminals, `#00d7af` on light terminals).
+- **Font Registry**: Fonts implement the `font.Font` interface (`Render(line) []string`, `Width(s) int`) and register themselves under a name. `font.Get(name)` resolves a font (falling back to `block`); `font.Names()` lists them with the default first. New fonts: a `map[rune][]string` wrapped in `NewBlock`, or a `figletFont`/`mappedFiglet` entry.
+- **Two Font Families**: Unicode block faces (`block`, `heavy`, `compact`) and FIGlet ASCII faces from go-figure. `heavy` is banner3 transliterated `#`→`█`. Block fonts upper-case input; each block glyph's rows must share one width (enforced by `TestBlockRowWidths`).
+- **Word Wrapping**: `font.Wrap(f, text, maxWidth)` greedily packs whole words using the font's own `Width`. Max columns = terminal width − 8.
+- **Centering**: Each wrapped line is rendered as a block and centered with one uniform pad so ragged-width FIGlet rows stay column-aligned (see `model.View`).
+- **Color**: Named presets in `internal/cmd/styles.go`; `parseColor` accepts a preset, a hex code, or an ANSI index. Default is adaptive teal (`#00f5d4` dark / `#00d7af` light).
+- **Persistent Config**: `color`, `font`, `bold`, `hint`, `no_hint` in TOML. `config.Save` writes only set fields; the interactive picker (`plaqq config`) seeds from the current file.
 - **Key Bindings**: Pressing the `Spacebar`, `Enter`, `Esc`, `q`, or `Ctrl+C` immediately quits the application, returning you back to the main terminal screen.

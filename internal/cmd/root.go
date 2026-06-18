@@ -25,6 +25,7 @@ var (
 
 	// Styling flags for the notice display.
 	flagColor  string
+	flagFont   string
 	flagBold   bool
 	flagHint   string
 	flagNoHint bool
@@ -32,7 +33,8 @@ var (
 
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json-output", false, "emit structured JSON output")
-	rootCmd.Flags().StringVar(&flagColor, "color", "", "notice text color as a hex code (e.g. #00f5d4) or ANSI index (0-255); defaults to adaptive teal")
+	rootCmd.Flags().StringVar(&flagColor, "color", "", "notice color: a preset name ("+strings.Join(presetOrder, ", ")+"), a hex code (e.g. #00f5d4), or an ANSI index (0-255); defaults to adaptive teal")
+	rootCmd.Flags().StringVar(&flagFont, "font", "", "font to render the notice in; one of: "+strings.Join(font.Names(), ", "))
 	rootCmd.Flags().BoolVar(&flagBold, "bold", true, "render the notice text in bold")
 	rootCmd.Flags().StringVar(&flagHint, "hint", defaultHint, "dismiss-hint text shown beneath the notice")
 	rootCmd.Flags().BoolVar(&flagNoHint, "no-hint", false, "hide the dismiss hint")
@@ -44,6 +46,10 @@ func parseColor(s string) (lipgloss.TerminalColor, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return nil, fmt.Errorf("color is empty")
+	}
+
+	if c, ok := presetColor(s); ok {
+		return c, nil
 	}
 
 	if strings.HasPrefix(s, "#") {
@@ -66,68 +72,90 @@ func parseColor(s string) (lipgloss.TerminalColor, error) {
 		return lipgloss.Color(s), nil
 	}
 
-	return nil, fmt.Errorf("invalid color %q: use a hex code like #00f5d4 or an ANSI index 0-255", s)
+	return nil, fmt.Errorf("invalid color %q: use a preset name (%s), a hex code like #00f5d4, or an ANSI index 0-255", s, strings.Join(presetOrder, ", "))
 }
 
 func isHexDigit(r rune) bool {
 	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')
 }
 
+// styleSettings is the effective notice styling after layering defaults, the
+// config file, and CLI flags.
+type styleSettings struct {
+	color  string
+	font   string
+	bold   bool
+	hint   string
+	noHint bool
+}
+
 // resolveStyle determines the effective notice styling by layering, in order:
 // built-in defaults, values from the config file, then any CLI flags the user
 // explicitly set (so a flag always wins over the config file).
-func resolveStyle(cmd *cobra.Command) (color string, bold bool, hint string, noHint bool, err error) {
-	color, bold, hint, noHint = "", true, defaultHint, false
+func resolveStyle(cmd *cobra.Command) (styleSettings, error) {
+	s := styleSettings{color: "", font: "", bold: true, hint: defaultHint, noHint: false}
 
 	path, err := config.Path()
 	if err != nil {
-		return "", false, "", false, err
+		return styleSettings{}, err
 	}
 	cfg, err := config.Load(path)
 	if err != nil {
-		return "", false, "", false, err
+		return styleSettings{}, err
 	}
 	if cfg.Color != nil {
-		color = *cfg.Color
+		s.color = *cfg.Color
+	}
+	if cfg.Font != nil {
+		s.font = *cfg.Font
 	}
 	if cfg.Bold != nil {
-		bold = *cfg.Bold
+		s.bold = *cfg.Bold
 	}
 	if cfg.Hint != nil {
-		hint = *cfg.Hint
+		s.hint = *cfg.Hint
 	}
 	if cfg.NoHint != nil {
-		noHint = *cfg.NoHint
+		s.noHint = *cfg.NoHint
 	}
 
 	if cmd.Flags().Changed("color") {
-		color = flagColor
+		s.color = flagColor
+	}
+	if cmd.Flags().Changed("font") {
+		s.font = flagFont
 	}
 	if cmd.Flags().Changed("bold") {
-		bold = flagBold
+		s.bold = flagBold
 	}
 	if cmd.Flags().Changed("hint") {
-		hint = flagHint
+		s.hint = flagHint
 	}
 	if cmd.Flags().Changed("no-hint") {
-		noHint = flagNoHint
+		s.noHint = flagNoHint
 	}
 
-	return color, bold, hint, noHint, nil
+	return s, nil
 }
 
 var rootCmd = &cobra.Command{
 	Use:   "plaqq [message]",
 	Short: "plaqq displays a notice across the terminal pane in chunky letters",
-	Long: `plaqq takes a message and displays it in a large chunky ASCII font centered
-on the terminal. It waits for the user to press the spacebar to dismiss the notice.
+	Long: `plaqq takes a message and displays it in a large chunky font centered on the
+terminal. It waits for the user to press the spacebar to dismiss the notice.
 
-The notice color, bold weight, and dismiss hint can be customized with the
---color, --bold, --hint, and --no-hint flags, or set as persistent defaults
-in the config file (see 'plaqq config'). Flags override the config file.`,
+The font, color, bold weight, and dismiss hint can be customized with the
+--font, --color, --bold, --hint, and --no-hint flags, or set as persistent
+defaults via 'plaqq config' (an interactive picker). Flags override the config.
+
+Colors accept a preset name (teal, coral, amber, lime, azure, violet, magenta,
+rose, crimson, slate), a hex code, or an ANSI index. Fonts include Unicode
+block faces (block, heavy, compact) and FIGlet ASCII faces (standard, slant,
+banner, big, small, doom, larry3d, mini, cyberlarge).`,
 	Example: `  plaqq "deploy starting"
-  plaqq --color "#ff5f87" "build failed"
-  plaqq --color 213 --bold=false "heads up"
+  plaqq --color coral "build failed"
+  plaqq --font heavy --color "#ff5f87" "build failed"
+  plaqq --font slant --bold=false "heads up"
   plaqq --hint "press space to continue" "meeting in 5"
   plaqq --no-hint "stand clear"`,
 	Args:          cobra.MaximumNArgs(1),
@@ -135,14 +163,19 @@ in the config file (see 'plaqq config'). Flags override the config file.`,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Resolve styling with precedence: built-in defaults < config file < CLI flags.
-		colorStr, bold, hint, noHint, err := resolveStyle(cmd)
+		style, err := resolveStyle(cmd)
 		if err != nil {
 			return err
 		}
 
+		if style.font != "" && !font.Has(style.font) {
+			return fmt.Errorf("unknown font %q: choose one of %s", style.font, strings.Join(font.Names(), ", "))
+		}
+		glyphFont := font.Get(style.font)
+
 		var noticeColor lipgloss.TerminalColor = lipgloss.AdaptiveColor{Light: "#00d7af", Dark: "#00f5d4"}
-		if colorStr != "" {
-			c, err := parseColor(colorStr)
+		if style.color != "" {
+			c, err := parseColor(style.color)
 			if err != nil {
 				return err
 			}
@@ -205,7 +238,7 @@ in the config file (see 'plaqq config'). Flags override the config file.`,
 		}
 
 		// Initialize Bubble Tea program
-		m := initialModel(noticeMsg, noticeColor, bold, hint, !noHint)
+		m := initialModel(noticeMsg, glyphFont, noticeColor, style.bold, style.hint, !style.noHint)
 		p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithoutCatchPanics())
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("run program: %w", err)
@@ -229,6 +262,7 @@ in the config file (see 'plaqq config'). Flags override the config file.`,
 type model struct {
 	text     string
 	hint     string
+	font     font.Font
 	color    lipgloss.TerminalColor
 	width    int
 	height   int
@@ -236,9 +270,10 @@ type model struct {
 	showHint bool
 }
 
-func initialModel(text string, color lipgloss.TerminalColor, bold bool, hint string, showHint bool) model {
+func initialModel(text string, glyphFont font.Font, color lipgloss.TerminalColor, bold bool, hint string, showHint bool) model {
 	return model{
 		text:     text,
+		font:     glyphFont,
 		color:    color,
 		bold:     bold,
 		hint:     hint,
@@ -275,40 +310,40 @@ func (m model) View() string {
 		maxWidth = 10
 	}
 
-	lines := font.WrapText(m.text, maxWidth)
+	lines := font.Wrap(m.font, m.text, maxWidth)
 
-	// Build the chunky ASCII text rows
-	var chunkyRows []string
-	for idx, line := range lines {
-		if idx > 0 {
-			// Blank spacing row between chunky wrap lines
-			chunkyRows = append(chunkyRows, "", "")
-		}
-
-		renderedLine := font.RenderString(line)
-		for r := 0; r < font.Height; r++ {
-			chunkyRows = append(chunkyRows, renderedLine[r])
-		}
-	}
-
-	// Stylize and center each chunky row horizontally
 	noticeStyle := lipgloss.NewStyle().Foreground(m.color).Bold(m.bold)
 
+	// Render each wrapped line as a block and center it. Each line is padded by
+	// one uniform amount so that fonts with ragged row widths (e.g. FIGlet)
+	// keep their columns aligned rather than shearing row by row.
 	var centeredRows []string
-	for _, row := range chunkyRows {
-		if row == "" {
-			centeredRows = append(centeredRows, "")
-			continue
+	for idx, line := range lines {
+		if idx > 0 {
+			// Blank spacing rows between wrapped lines.
+			centeredRows = append(centeredRows, "", "")
 		}
 
-		rowRunesCount := len([]rune(row))
-		padding := (m.width - rowRunesCount) / 2
+		rows := m.font.Render(line)
+		lineWidth := 0
+		for _, row := range rows {
+			if w := len([]rune(row)); w > lineWidth {
+				lineWidth = w
+			}
+		}
+		padding := (m.width - lineWidth) / 2
 		if padding < 0 {
 			padding = 0
 		}
+		leftPad := strings.Repeat(" ", padding)
 
-		centeredRow := strings.Repeat(" ", padding) + noticeStyle.Render(row)
-		centeredRows = append(centeredRows, centeredRow)
+		for _, row := range rows {
+			if strings.TrimSpace(row) == "" {
+				centeredRows = append(centeredRows, "")
+				continue
+			}
+			centeredRows = append(centeredRows, leftPad+noticeStyle.Render(row))
+		}
 	}
 
 	chunkyBlock := strings.Join(centeredRows, "\n")

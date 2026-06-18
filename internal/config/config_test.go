@@ -39,6 +39,48 @@ func TestLoadParsesValues(t *testing.T) {
 	}
 }
 
+func TestSaveRoundTrips(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sub", "config.toml")
+	color, font, hint := "coral", "heavy", "press space"
+	bold, noHint := false, true
+	in := &Config{Color: &color, Font: &font, Bold: &bold, Hint: &hint, NoHint: &noHint}
+
+	if err := Save(path, in); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load saved config: %v", err)
+	}
+	if got.Color == nil || *got.Color != color || got.Font == nil || *got.Font != font {
+		t.Errorf("color/font round-trip = %v/%v; want %q/%q", got.Color, got.Font, color, font)
+	}
+	if got.Bold == nil || *got.Bold != bold || got.NoHint == nil || *got.NoHint != noHint {
+		t.Errorf("bold/no_hint round-trip = %v/%v; want %v/%v", got.Bold, got.NoHint, bold, noHint)
+	}
+	if got.Hint == nil || *got.Hint != hint {
+		t.Errorf("hint round-trip = %v; want %q", got.Hint, hint)
+	}
+}
+
+func TestSaveOmitsUnsetFields(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	font := "slant"
+	if err := Save(path, &Config{Font: &font}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Font == nil || *got.Font != font {
+		t.Errorf("font = %v; want %q", got.Font, font)
+	}
+	if got.Color != nil || got.Bold != nil || got.Hint != nil || got.NoHint != nil {
+		t.Errorf("unset fields should stay nil, got %+v", got)
+	}
+}
+
 func TestLoadInvalidTOML(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(path, []byte("color = "), 0o644); err != nil {
