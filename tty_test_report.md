@@ -14,43 +14,17 @@ This report documents the interactive TTY test runs performed for the `plaqq` bi
 
 ---
 
-## Test 1: Default Notice (No Arguments)
+## Test 1: Interactive Prompt (No Arguments)
 * **Configuration**: `bin/plaqq` (no arguments)
 * **Window Size**: 80x24 (standard 80x24 layout)
-* **Expected Notice**: `"REMEMBER TO RUN E2E TESTS BEFORE PUSHING"`
-* **Dismissal**: Spacebar keypress
+* **Expected Behavior**: Prompts user for a message interactively using a `huh` input text prompt.
 * **Result**: **PASS**
 
 ### Captured Terminal Output
 ```text
-
-
-                      ███████ ██████  ▄████ ███████  ▄████
-                         █    █      ▀█▄▄▄     █    ▀█▄▄▄
-                         █    █████   ▀▀▀█▄    █     ▀▀▀█▄
-                         █    █      ▄▄▄▄█▀    █    ▄▄▄▄█▀
-                         █    ██████ ████▀     █    ████▀
-
-
-                   ████▄  ██████ ██████  ▄██▄  ████▄  ██████
-                   █   █  █      █      █    █ █   █  █
-                   ████▀  █████  █████  █    █ ████▀  █████
-                   █   █  █      █      █    █ █  █   █
-                   ████▀  ██████ █       ▀██▀  █   █  ██████
-
-
-                ████▄  █    █  ▄████ █    █ █████ █    █  ▄████
-                █   █  █    █ ▀█▄▄▄  █    █   █   ██   █ █▀
-                ████▀  █    █  ▀▀▀█▄ ██████   █   █ █  █ █  ███
-                █      █    █ ▄▄▄▄█▀ █    █   █   █  █ █ █▄   █
-                █       ▀██▀  ████▀  █    █ █████ █   ██  ▀████
-
-
-                           [ Press Space to dismiss ]
+┃ Enter notice message
+┃ > e.g. remember to run e2e tests before pushing
 ```
-
-> [!NOTE]
-> In an 80x24 terminal, the default message wraps into 5 lines, which takes up a total height of 33 chunky rows + 3 spacing/hint rows = 36 rows. Since 36 > 24, the top lines scroll off the screen. This is expected terminal behavior when content height exceeds window height.
 
 ---
 
