@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,24 +16,88 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const defaultHint = "[ Press Space to dismiss ]"
+
 var (
 	version    string
 	jsonOutput bool
+
+	// Styling flags for the notice display.
+	flagColor  string
+	flagBold   bool
+	flagHint   string
+	flagNoHint bool
 )
 
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json-output", false, "emit structured JSON output")
+	rootCmd.Flags().StringVar(&flagColor, "color", "", "notice text color as a hex code (e.g. #00f5d4) or ANSI index (0-255); defaults to adaptive teal")
+	rootCmd.Flags().BoolVar(&flagBold, "bold", true, "render the notice text in bold")
+	rootCmd.Flags().StringVar(&flagHint, "hint", defaultHint, "dismiss-hint text shown beneath the notice")
+	rootCmd.Flags().BoolVar(&flagNoHint, "no-hint", false, "hide the dismiss hint")
+}
+
+// parseColor validates a user-supplied color string and returns the matching
+// lipgloss color. It accepts a hex code (#rgb or #rrggbb) or an ANSI index (0-255).
+func parseColor(s string) (lipgloss.TerminalColor, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, fmt.Errorf("color is empty")
+	}
+
+	if strings.HasPrefix(s, "#") {
+		hex := s[1:]
+		if len(hex) != 3 && len(hex) != 6 {
+			return nil, fmt.Errorf("invalid hex color %q: expected #rgb or #rrggbb", s)
+		}
+		for _, r := range hex {
+			if !isHexDigit(r) {
+				return nil, fmt.Errorf("invalid hex color %q", s)
+			}
+		}
+		return lipgloss.Color(s), nil
+	}
+
+	if n, err := strconv.Atoi(s); err == nil {
+		if n < 0 || n > 255 {
+			return nil, fmt.Errorf("invalid ANSI color %d: expected an index 0-255", n)
+		}
+		return lipgloss.Color(s), nil
+	}
+
+	return nil, fmt.Errorf("invalid color %q: use a hex code like #00f5d4 or an ANSI index 0-255", s)
+}
+
+func isHexDigit(r rune) bool {
+	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')
 }
 
 var rootCmd = &cobra.Command{
 	Use:   "plaqq [message]",
 	Short: "plaqq displays a notice across the terminal pane in chunky letters",
-	Long: `plaqq takes a message and displays it in a large chunky ASCII font centered 
-on the terminal. It waits for the user to press the spacebar to dismiss the notice.`,
+	Long: `plaqq takes a message and displays it in a large chunky ASCII font centered
+on the terminal. It waits for the user to press the spacebar to dismiss the notice.
+
+The notice color, bold weight, and dismiss hint can be customized with the
+--color, --bold, --hint, and --no-hint flags.`,
+	Example: `  plaqq "deploy starting"
+  plaqq --color "#ff5f87" "build failed"
+  plaqq --color 213 --bold=false "heads up"
+  plaqq --hint "press space to continue" "meeting in 5"
+  plaqq --no-hint "stand clear"`,
 	Args:          cobra.MaximumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var noticeColor lipgloss.TerminalColor = lipgloss.AdaptiveColor{Light: "#00d7af", Dark: "#00f5d4"}
+		if flagColor != "" {
+			c, err := parseColor(flagColor)
+			if err != nil {
+				return err
+			}
+			noticeColor = c
+		}
+
 		var noticeMsg string
 		if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
 			noticeMsg = args[0]
@@ -89,7 +154,7 @@ on the terminal. It waits for the user to press the spacebar to dismiss the noti
 		}
 
 		// Initialize Bubble Tea program
-		m := initialModel(noticeMsg)
+		m := initialModel(noticeMsg, noticeColor, flagBold, flagHint, !flagNoHint)
 		p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithoutCatchPanics())
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("run program: %w", err)
@@ -107,14 +172,22 @@ on the terminal. It waits for the user to press the spacebar to dismiss the noti
 }
 
 type model struct {
-	text   string
-	width  int
-	height int
+	text     string
+	hint     string
+	color    lipgloss.TerminalColor
+	width    int
+	height   int
+	bold     bool
+	showHint bool
 }
 
-func initialModel(text string) model {
+func initialModel(text string, color lipgloss.TerminalColor, bold bool, hint string, showHint bool) model {
 	return model{
-		text: text,
+		text:     text,
+		color:    color,
+		bold:     bold,
+		hint:     hint,
+		showHint: showHint,
 	}
 }
 
@@ -164,9 +237,7 @@ func (m model) View() string {
 	}
 
 	// Stylize and center each chunky row horizontally
-	noticeStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#00d7af", Dark: "#00f5d4"}).
-		Bold(true)
+	noticeStyle := lipgloss.NewStyle().Foreground(m.color).Bold(m.bold)
 
 	var centeredRows []string
 	for _, row := range chunkyRows {
@@ -187,20 +258,25 @@ func (m model) View() string {
 
 	chunkyBlock := strings.Join(centeredRows, "\n")
 
-	// Stylize and center dismissal hint
-	hintStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "242"}).
-		Italic(true)
+	showHint := m.showHint && strings.TrimSpace(m.hint) != ""
 
-	hint := "[ Press Space to dismiss ]"
-	hintPadding := (m.width - len(hint)) / 2
-	if hintPadding < 0 {
-		hintPadding = 0
+	// Stylize and center dismissal hint
+	var centeredHint string
+	contentHeight := len(centeredRows) // notice height
+	if showHint {
+		hintStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "242"}).
+			Italic(true)
+
+		hintPadding := (m.width - len([]rune(m.hint))) / 2
+		if hintPadding < 0 {
+			hintPadding = 0
+		}
+		centeredHint = strings.Repeat(" ", hintPadding) + hintStyle.Render(m.hint)
+		contentHeight += 3 // spacing + hint height
 	}
-	centeredHint := strings.Repeat(" ", hintPadding) + hintStyle.Render(hint)
 
 	// Center everything vertically
-	contentHeight := len(centeredRows) + 3 // notice height + spacing + hint height
 	topPadding := (m.height - contentHeight) / 2
 	if topPadding < 0 {
 		topPadding = 0
@@ -209,8 +285,10 @@ func (m model) View() string {
 	var sb strings.Builder
 	sb.WriteString(strings.Repeat("\n", topPadding))
 	sb.WriteString(chunkyBlock)
-	sb.WriteString("\n\n\n") // Gap before hint
-	sb.WriteString(centeredHint)
+	if showHint {
+		sb.WriteString("\n\n\n") // Gap before hint
+		sb.WriteString(centeredHint)
+	}
 
 	bottomPadding := m.height - topPadding - contentHeight
 	if bottomPadding > 0 {

@@ -403,10 +403,12 @@ func WrapText(text string, maxWidth int) []string {
 	var currentLine []string
 
 	for _, word := range words {
-		testLine := append(currentLine, word)
-		joined := strings.Join(testLine, " ")
+		joined := word
+		if len(currentLine) > 0 {
+			joined = strings.Join(currentLine, " ") + " " + word
+		}
 		if StringWidth(joined) <= maxWidth {
-			currentLine = testLine
+			currentLine = append(currentLine, word)
 		} else {
 			if len(currentLine) > 0 {
 				lines = append(lines, strings.Join(currentLine, " "))

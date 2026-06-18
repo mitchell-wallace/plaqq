@@ -40,10 +40,29 @@ irm https://raw.githubusercontent.com/mitchell-wallace/plaqq/main/install.ps1 | 
 
 ### Displaying Notices
 
-To display a notice (if no message is specified, `plaqq` defaults to a reminder to run tests before pushing):
+To display a notice (if no message is specified, `plaqq` prompts you to enter one):
 ```bash
 plaqq "remember to run e2e tests before pushing"
 ```
+
+### Styling
+
+The notice appearance can be customized with flags (run `plaqq -h` to see them all):
+
+*   **`--color`**: Notice text color as a hex code (`#00f5d4`) or ANSI index (`0`-`255`). Defaults to an adaptive teal that suits both light and dark terminals.
+    ```bash
+    plaqq --color "#ff5f87" "build failed"
+    plaqq --color 213 "heads up"
+    ```
+*   **`--bold`**: Render the notice in bold (default `true`). Disable with `--bold=false`.
+*   **`--hint`**: Override the dismiss-hint text shown beneath the notice.
+    ```bash
+    plaqq --hint "press space to continue" "meeting in 5"
+    ```
+*   **`--no-hint`**: Hide the dismiss hint entirely.
+    ```bash
+    plaqq --no-hint "stand clear"
+    ```
 
 ### Options & Subcommands
 
