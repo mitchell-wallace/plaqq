@@ -19,16 +19,56 @@ ignored so the setting falls through to the lower-precedence layer.
 - **WHEN** `PLAQQ_COLOR=` (empty) is exported and the config file sets `color = "ok"`
 - **THEN** the notice uses the `ok` colour from the config file
 
+### Requirement: Invalid environment value warns and continues
+
+The system SHALL, when a styling environment variable holds an invalid value
+(unknown font/colour name, malformed colour, or non-boolean for a boolean
+variable), print a warning to standard error, ignore that variable, and continue
+using the next-lower-precedence source. It SHALL NOT abort.
+
+#### Scenario: Bad boolean warns and falls through
+
+- **WHEN** `PLAQQ_BOLD=maybe` is exported and `plaqq "hi"` is run
+- **THEN** a warning naming `PLAQQ_BOLD` is printed to stderr and the notice is still displayed using the resolved bold default
+
+#### Scenario: Unknown font warns and falls through
+
+- **WHEN** `PLAQQ_FONT=nonsense` is exported and `plaqq "hi"` is run
+- **THEN** a warning naming `PLAQQ_FONT` is printed to stderr and the notice is displayed using the lower-precedence font
+
+### Requirement: Per-terminal session state
+
+The system SHALL persist a per-terminal-session styling record (at least font and
+colour) and read it as the session-state layer. The record SHALL be keyed to the
+terminal session so that separate panes do not share it, and a fresh session SHALL
+start without one. An invalid value in the record SHALL warn and fall through
+rather than abort.
+
+#### Scenario: A fresh session has no state
+
+- **WHEN** `plaqq "hi"` is run in a terminal where no session state has been written
+- **THEN** the notice resolves from defaults, config, and env only (no session-state influence)
+
+#### Scenario: Session state styles later invocations
+
+- **WHEN** a session-state record sets `font = "heavy"` for the current terminal
+- **THEN** a subsequent `plaqq "hi"` in that terminal renders with the `heavy` font
+
 ### Requirement: Resolution precedence
 
 The system SHALL resolve each notice setting by layering sources in increasing
-priority: built-in default, user config file, session environment variable, then
-CLI flag. A higher-priority source that is set SHALL override a lower one for
-that setting independently of the other settings.
+priority: built-in default, user config file, session environment variable,
+session state, then CLI flag. A higher-priority source that is set SHALL override
+a lower one for that setting independently of the other settings.
 
-#### Scenario: Flag beats env var
+#### Scenario: Flag beats session state
 
-- **WHEN** `PLAQQ_COLOR=alert` is exported and `plaqq --color ok "hi"` is run
+- **WHEN** session state sets `color = "alert"` and `plaqq --color ok "hi"` is run
+- **THEN** the notice uses the `ok` colour
+
+#### Scenario: Session state beats env var
+
+- **WHEN** `PLAQQ_COLOR=alert` is exported and session state sets `color = "ok"`
 - **THEN** the notice uses the `ok` colour
 
 #### Scenario: Env var beats config file
@@ -38,45 +78,26 @@ that setting independently of the other settings.
 
 #### Scenario: Per-setting independence
 
-- **WHEN** the config file sets `color` and `PLAQQ_FONT` sets only the font
+- **WHEN** the config file sets `color` and only `PLAQQ_FONT` sets the font
 - **THEN** the colour comes from the config file and the font from the env var
 
-### Requirement: Invalid environment value is a hard error
+### Requirement: Session helper writes and clears session state
 
-The system SHALL reject a styling environment variable whose value is invalid
-(an unknown font/colour name, a malformed colour, or a non-boolean for a boolean
-variable), failing with a non-zero exit and a message naming the offending
-variable.
+The system SHALL provide `plaqq config --session` to write the current terminal's
+session-state record, and `plaqq config --session --clear` to remove it. Writing
+the record SHALL NOT require shell evaluation or integration.
 
-#### Scenario: Bad boolean
-
-- **WHEN** `PLAQQ_BOLD=maybe` is exported and `plaqq "hi"` is run
-- **THEN** the command exits non-zero and the error names `PLAQQ_BOLD`
-
-#### Scenario: Unknown font name
-
-- **WHEN** `PLAQQ_FONT=nonsense` is exported and `plaqq "hi"` is run
-- **THEN** the command exits non-zero and the error names `PLAQQ_FONT` and lists the valid fonts
-
-### Requirement: Session setup helper emits shell exports
-
-The system SHALL provide a session mode (`plaqq config --session`) that prints
-shell `export` statements for the selected styling to standard output, so that
-`eval "$(plaqq config --session)"` configures the current terminal session. The
-interactive picker SHALL render to standard error so standard output carries only
-the export statements.
-
-#### Scenario: Non-interactive export for scripts
+#### Scenario: Write session state
 
 - **WHEN** `plaqq config --session --color alert --font heavy` is run
-- **THEN** standard output contains `export PLAQQ_COLOR` and `export PLAQQ_FONT` assignments reflecting those choices
+- **THEN** the current terminal's session-state record is set to that colour and font, and a subsequent `plaqq "hi"` uses them
 
-#### Scenario: Eval applies to the session
+#### Scenario: Interactive session write
 
-- **WHEN** the user runs `eval "$(plaqq config --session --color alert)"`
-- **THEN** `PLAQQ_COLOR` is set to `alert` in that shell and subsequent `plaqq` calls use it
+- **WHEN** `plaqq config --session` is run with no style flags in an interactive terminal
+- **THEN** it opens the picker and writes the chosen font/colour to the current terminal's session-state record
 
-#### Scenario: Reminder when not captured
+#### Scenario: Clear session state
 
-- **WHEN** `plaqq config --session` is run with standard output attached to a TTY (not captured by `eval`)
-- **THEN** it prints a hint to wrap the command in `eval "$(…)"`
+- **WHEN** `plaqq config --session --clear` is run after a session record exists
+- **THEN** the record is removed and a subsequent `plaqq "hi"` no longer reflects it

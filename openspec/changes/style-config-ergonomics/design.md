@@ -2,95 +2,146 @@
 
 ## Resolution precedence
 
-Insert a session env-var layer into the existing chain (`resolveStyle` in
-`internal/cmd/root.go`). Lowest wins are overridden by higher:
+`resolveStyle` (`internal/cmd/root.go`) layers sources per setting, lowest to
+highest priority:
 
 ```
 built-in defaults
-  < user config file        (plaqq config — global, all panes)
-  < session env vars        (PLAQQ_* — per terminal/pane)
-  < CLI flags               (--font/--color/… — this invocation)
-  < interactive customise   (this single notice, bare-plaqq path only)
+  < user config file   (plaqq config — global, all panes)
+  < session env vars    (PLAQQ_* — manual/ambient, this shell)
+  < session state       (customise / plaqq config --session — this terminal)
+  < CLI flags           (--font/--color/… — this invocation)
 ```
 
-Each layer is independent per field: a pane may set only `PLAQQ_COLOR` while font
-still comes from the config file. The interactive customise step sits *above*
-everything but applies to one render and persists nothing.
+The interactive **customise** step applies to the current render *and* writes the
+session-state layer, so it both styles the notice now and sticks for the rest of
+the session. Each setting resolves independently (a pane may take colour from an
+env var and font from the config file).
+
+Session env vars and session state are both "this terminal" scope; session state
+sits **above** env vars so that a customise choice is authoritative for the
+session even if an env var is also set (the common case has no env var, so
+customise simply sticks). A one-off `--flag` still overrides for that call.
+
+## Strictness tracks authorship
+
+How a bad value is handled depends on how deliberately the user aimed it at plaqq:
+
+| source | on invalid value | why |
+|---|---|---|
+| CLI flag | **hard error** — list valid options + nearest-match suggestion | typed this instant; immediate feedback wanted |
+| user config file | **hard error** — list valid options | authored for plaqq; `plaqq config` repairs it |
+| session env var | **warn to stderr, ignore, fall through** | ambient/inherited, may be stale; must never brick the pane |
+| session state | **warn to stderr, ignore, fall through** | machine-written, ephemeral |
+
+Flags and the config file — things the user wrote *for* plaqq — fail loudly;
+env vars and the session-state file — ambient or auto-written — degrade
+gracefully. This keeps `refine-fonts-and-palette`'s hard-error stance for
+flags/config while making the session layers forgiving, as requested. (An env var
+is often inherited from a shell rc or another tool, so it shouldn't be able to
+break an unrelated `plaqq`; a config file is a document the user deliberately
+wrote and the picker can fix.) Warnings print to stderr before the interactive
+form *and* the alt-screen program launch (not deferred on a channel like the
+update-notice), so they land in scrollback rather than corrupting the TUI.
+
+**`resolveStyle` becomes source-aware.** Because both the fail-loud and the
+warn-and-skip paths now live inside resolution, `resolveStyle` must validate each
+value *knowing which layer it came from*: an invalid flag/config value is returned
+as an error; an invalid env/session value is warned and skipped. It therefore
+can't rely on `font.Get`'s silent fallback or a single post-resolution check —
+validation moves into the layering. This is the key seam shared with
+`refine-fonts-and-palette` (which moves font/colour validation into resolution);
+the two changes touch the same function and must agree that it is per-layer.
 
 ## Session env-var schema
 
-Mirror the config fields one-to-one:
+Mirrors the config fields one-to-one:
 
 | env var | maps to | parse |
 |---|---|---|
-| `PLAQQ_COLOR` | colour | preset name \| hex \| ANSI index (same as `--color`) |
+| `PLAQQ_COLOR` | colour | preset \| hex \| ANSI index (same as `--color`) |
 | `PLAQQ_FONT` | font | font name (same as `--font`) |
 | `PLAQQ_BOLD` | bold | `strconv.ParseBool` |
 | `PLAQQ_HINT` | hint text | string (verbatim) |
 | `PLAQQ_NO_HINT` | hide hint | `strconv.ParseBool` |
 
-An unset/empty var is ignored (falls through to the config file). A *set but
-invalid* var is a **hard error** naming the variable
-(`PLAQQ_BOLD="maybe": invalid bool`), consistent with the flag/config hard-error
-model from `refine-fonts-and-palette`. Tradeoff noted: a stale exported var
-breaks every `plaqq` in that pane until fixed — acceptable, and the error says
-exactly which var and why. (`PLAQQ_CONFIG` is pre-existing and unrelated — it
-selects the config *file path*, not a style; keep it distinct.)
+Unset/empty → ignored (fall through). Invalid → warn + ignore. `PLAQQ_CONFIG` is
+pre-existing and unrelated (it selects the config *file path*, not a style).
 
-## Why env vars give "per-pane" for free
+## "Customise sets the session" — honestly, a session-state file
 
-Each pane runs its own shell process; an `export` there is inherited by every
-child (`plaqq`) and dies when the shell exits. New panes start fresh, so they
-don't inherit another pane's overrides (tmux/screen `update-environment` aside).
-No state file, no pane IDs to track — the shell already scopes it.
+A child process cannot mutate its parent shell's environment, so `plaqq` cannot
+set an env var that a *later* `plaqq` in the same shell would inherit — and the
+customise step couldn't anyway, since it ends by rendering the notice, not by
+emitting shell. So "customise sets the env vars" is delivered by a small
+**plaqq-managed session-state file** read as the session-state layer.
+Functionally identical to a session env var: set it once, every later `plaqq` in
+that terminal reuses it.
 
-## The parent-shell constraint & the session helper
+- **Keyed per terminal session** by the parent shell PID (`os.Getppid()`): every
+  `plaqq` typed at one shell prompt shares it; a new pane (new shell) starts
+  clean. (The controlling TTY is a more precise key; PPID is zero-dep and good
+  enough — a possible refinement. Edge: PPID reuse after the shell exits — stamp
+  the file with the shell start time to detect it, else accept + `--clear`.)
+- **Stored** under `$XDG_RUNTIME_DIR/plaqq/` (cleared at logout) when present,
+  else `os.TempDir()`; filename includes the session key.
+- **Written by** the customise step and by `plaqq config --session`, which writes
+  the file *directly* — no `eval`/shell integration needed, sidestepping the
+  parent-shell problem entirely.
+- **Cleared by** `plaqq config --session --clear` (and naturally when the runtime
+  dir is wiped at logout).
+- **Written atomically** (temp file + `rename`) with mode `0600`; on read, a
+  malformed/invalid record warns and is ignored (it never blocks rendering).
 
-A child process can't mutate its parent shell's environment, so `plaqq` cannot
-"set" a session var directly — it can only *emit* shell that the shell evaluates.
-Standard pattern (direnv, zoxide, fnm, starship):
+Caveat of session-state-above-env: once customise has written session state, a
+later `export PLAQQ_COLOR=…` in that pane appears to do nothing (session state
+wins) until `--clear` or a fresh pane. That is the cost of "customise is
+authoritative for the session"; it's documented, and `--clear` resets it. (The
+alternative ordering — env above session — was rejected because it would stop a
+customise from sticking whenever any `PLAQQ_*` is exported, defeating the feature.)
 
-- `plaqq config --session` runs the interactive picker **rendered to stderr/TTY**
-  (via `WithOutput(os.Stderr)`), then prints the chosen style as
-  `export PLAQQ_COLOR=…; export PLAQQ_FONT=…` to **stdout**.
-- The user wraps it: `eval "$(plaqq config --session)"`. The picker shows; the
-  exports apply to the current pane.
-- Non-interactive form for scripts/tests: `plaqq config --session --color alert
-  --font heavy` skips the picker and just prints the exports.
-- If stdout is a TTY (i.e. *not* captured by `eval`), print a one-line hint
-  reminding the user to wrap the call in `eval "$(…)"`, so a bare
-  `plaqq config --session` isn't silently useless.
-- Manual `export PLAQQ_COLOR=alert PLAQQ_FONT=heavy` is always documented as the
-  zero-magic fallback.
+For users who specifically want real exported env vars (e.g. to share with other
+tools), manual `export PLAQQ_*` still works; an optional `--export` form of
+`plaqq config --session` that prints `export` lines for `eval` is an open
+question, not core.
 
-`plaqq config` with no flags keeps writing the **user-global config file**
-unchanged — it is the per-pane base, not a session setter.
+## Interactive flow (bare `plaqq`, no message arg), with back-navigation
 
-## Interactive customise flow (bare `plaqq`, no message arg)
+One `huh.Form` with two groups, so the user can move *back* to the message after
+entering customise (sequential `Run()` calls could not):
 
-Today: prompt for message → render. New:
+- **Group 1:** message `Input` + a Confirm/Customise `Select` (Confirm focused by
+  default).
+- **Group 2** (`WithHideFunc`, shown only when Customise is chosen): font
+  `Select` + colour `Select`, each seeded from the fully-resolved style.
 
-1. `huh.Input` — message (unchanged).
-2. A two-option choice — **Confirm** (default, focused) or **Customise**.
-3. Confirm → render with the resolved style.
-4. Customise → `huh.Select` font + `huh.Select` colour, each seeded from the
-   resolved style → render with those for this notice only.
+Confirm → group 2 stays hidden; submitting renders with the resolved style (fast
+path ≈ Enter, Enter). Customise → group 2 appears; the user can `shift+tab` back
+to group 1 to edit the message, then forward again. On submit with Customise:
+write the chosen font+colour to the session-state file **and** render this notice
+with them. Esc/Ctrl-C at any step exits cleanly. `plaqq "message"` (arg present)
+bypasses the form and renders immediately.
 
-Esc/Ctrl-C at any step exits cleanly (current behaviour). Confirm being the
-default keeps the fast path to ~two keystrokes (Enter through message, Enter on
-Confirm). `plaqq "message"` (arg present) bypasses all of this and renders
-immediately — the customise step never gates the scripted/quick path.
+Because the resolved style now includes the session-state layer, a later bare
+`plaqq` that just confirms — or a `plaqq "msg"` — automatically shows the
+customised font/colour without re-customising. Customise offers only font +
+colour (the visual choices); bold/hint stay on flags/config/env to keep the form
+to two fields.
 
-Customise only offers font + colour (the high-value, visual choices); bold/hint
-stay on flags/config/env to keep the picker to two fields.
+## Non-interactive / `--json-output`
+
+The confirm/customise form (like today's message prompt) needs an interactive
+TTY. When bare `plaqq` is run with no message argument and stdin is **not** an
+interactive TTY (piped, CI) or `--json-output` is set, plaqq must **not** launch
+the form — it exits with a clear error telling the user to pass a message
+argument. This also fixes a pre-existing latent bug: today `huh.NewInput()`
+(`root.go:189`) runs regardless of `--json-output`/TTY and will fail or hang.
+Detect interactivity with `golang.org/x/term.IsTerminal` (already an indirect
+dep via charm).
 
 ## Open questions
 
-- **Session helper surface:** `plaqq config --session` (chosen here) vs a
-  dedicated `plaqq env` subcommand. Leaning `--session` to keep one config entry
-  point; revisit if it muddies `plaqq config`.
-- **Should customise offer "save"?** It can't export to the parent shell, but it
-  could offer "save as user default" (write config) at the end. Deferred — keep
-  v1 one-shot to avoid surprising persistence.
-- **Persisting hint/bold per session** is supported via env vars but not via the
-  customise picker; revisit if users want them there.
+- Session key: PPID (chosen) vs controlling TTY vs an injected `PLAQQ_SESSION` id.
+- Optional `plaqq config --session --export` (emit `export` lines for `eval`) for
+  users who want real env vars rather than the state file.
+- Whether customise should also offer "save as user default" (write the config).

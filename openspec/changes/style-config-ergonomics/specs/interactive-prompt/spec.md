@@ -12,29 +12,45 @@ the default selection so the fast path requires no extra navigation.
 #### Scenario: Confirm shows the notice
 
 - **WHEN** the user runs bare `plaqq`, enters a message, and chooses Confirm
-- **THEN** the notice is displayed using the resolved style (defaults/config/env/flags)
+- **THEN** the notice is displayed using the resolved style (defaults/config/env/session/flags)
 
 #### Scenario: Confirm is the default
 
 - **WHEN** the message has been entered and the choice is presented
 - **THEN** Confirm is the focused/default option
 
-### Requirement: Customise chooses font and colour for one notice
+### Requirement: Customise chooses font and colour and sticks for the session
 
 The system SHALL, when the user chooses **Customise**, let them select a font and
-a colour, each seeded from the currently resolved style, and then display the
-notice using those selections. These selections SHALL apply to the current notice
-only and SHALL NOT be written to the config file or environment.
+a colour (each seeded from the currently resolved style), display the notice using
+those selections, and write them to the session-state layer. Subsequent
+invocations in the same terminal session SHALL therefore use the customised font
+and colour without the user re-customising.
 
 #### Scenario: Customised render
 
 - **WHEN** the user chooses Customise and picks a font and colour
 - **THEN** the notice renders with the chosen font and colour
 
-#### Scenario: Customise does not persist
+#### Scenario: Customise sticks for the session
 
-- **WHEN** the user customises a notice and the program exits
-- **THEN** the config file and environment are unchanged, and a subsequent bare `plaqq` again starts from the resolved style
+- **WHEN** the user customises a notice with a font and colour, then later runs `plaqq "next"` in the same terminal session
+- **THEN** the second notice renders with the same font and colour without prompting to customise
+
+#### Scenario: A separate pane is unaffected
+
+- **WHEN** the user customises in one pane and runs `plaqq "hi"` in a different pane
+- **THEN** the second pane renders from its own resolved style, not the first pane's customisation
+
+### Requirement: Customise allows editing the message
+
+The system SHALL allow the user, after choosing **Customise**, to navigate back to
+the message field and change it before the notice is displayed.
+
+#### Scenario: Edit message after entering customise
+
+- **WHEN** the user enters a message, chooses Customise, navigates back, edits the message, and proceeds
+- **THEN** the notice displays the edited message with the customised style
 
 ### Requirement: Message-argument path is immediate
 
@@ -45,6 +61,23 @@ notice immediately without presenting the confirm/customise choice.
 
 - **WHEN** the user runs `plaqq "deploy starting"`
 - **THEN** the notice is displayed at once with no confirm/customise step
+
+### Requirement: Non-interactive invocation requires a message
+
+The system SHALL, when invoked with no message argument in a context where the
+interactive prompt cannot run — standard input is not an interactive terminal, or
+`--json-output` is set — exit with a non-zero status and an error instructing the
+user to supply a message argument, instead of launching the interactive form.
+
+#### Scenario: Piped stdin with no message
+
+- **WHEN** `echo | plaqq` is run (stdin not a TTY) with no message argument
+- **THEN** the program exits non-zero with an error asking for a message argument and does not launch the form
+
+#### Scenario: JSON output with no message
+
+- **WHEN** `plaqq --json-output` is run with no message argument
+- **THEN** the program exits non-zero (structured error) without launching the form
 
 ### Requirement: Aborting the prompt exits cleanly
 

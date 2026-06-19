@@ -95,7 +95,12 @@ the repair path, so it must still open: an unknown stored font/colour is shown a
 the default selection (not an error), letting the user pick a valid one and save.
 
 Pre-1.0 with a tiny userbase, so no alias layer — the removed names are simply
-gone and documented in the changelog.
+gone and documented in the changelog. The error message SHALL list the valid
+names and, when the input is close to one (small edit distance, e.g. a renamed or
+mistyped preset), suggest the nearest match ("unknown font 'heavyy'; did you mean
+'heavy'?"). Note the split with `style-config-ergonomics`: flags and the config
+file hard-error this way, but session env vars / session state only *warn* and
+fall through — strictness tracks how deliberately the value was aimed at plaqq.
 
 ## Out of scope (v2 candidates)
 
