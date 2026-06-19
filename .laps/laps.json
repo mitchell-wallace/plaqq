@@ -1,4 +1,225 @@
 {
   "version": 2,
-  "tasks": []
+  "tasks": [
+    {
+      "id": "plaq-4502",
+      "title": "Add font gallery and glyph test harness",
+      "description": "Context: first lap of the refine-fonts-and-palette batch (openspec/changes/refine-fonts-and-palette/ — read design.md '## Authoring pipeline' and tasks 1.1-1.3, 2.1). This is the tooling that lets later laps SEE and regression-guard glyphs before any are authored. Outcome: a headless cmd/fontgallery prints to stdout (no TTY, no Bubble Tea) a fixed sample `SHIP IT! BUILD FAILED 0123` for every registered font plus a full-charset dump per font; a test harness exists with golden snapshots per font under internal/font/testdata (with an -update flag), an equal-width-rows invariant test across ALL fonts, and a charset-coverage test. Define the uppercase charset constant: A-Z 0-9 ! ? . , : ; ' - / \u0026 % ( ) and space. Files \u0026 scope: new cmd/fontgallery/main.go; internal/font/*_test.go (extend TestBlockRowWidths to every font); internal/font/testdata/. Do not author or change any glyphs yet. Design: the coverage test MUST assert against each font's glyph MAP KEYS, not rendered output — `?` is also block.go's not-found marker, so checking output would false-positive. Coverage/golden tests are expected to be RED until the authoring laps fill the charset; that red is the intended safety net. Acceptance: `go run ./cmd/fontgallery` prints all current fonts and charset dumps; `go build ./...` is green; new tests compile and run. Do not tick tasks.md boxes (only VERIFY does).",
+      "assignee": "JUNIOR",
+      "isDone": false,
+      "order": 65536,
+      "createdAt": "2026-06-19T06:35:14.47716831Z",
+      "updatedAt": "2026-06-19T06:35:14.47716831Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-3c04",
+      "title": "Author the block (medium) font glyphs",
+      "description": "Context: refine-fonts-and-palette design.md '## The 3 fonts' and '## Charset', tasks 2.2. `block` is the default workhorse and sets the authoring pattern the other two follow. Outcome: `block` renders every charset glyph as a clean, medium-weight, unmistakably legible block figure that reads at a glance across a terminal pane (plaqq's whole job is shouty attention alerts). Files \u0026 scope: only the `block` glyph map in internal/font/ (font.go/block.go area); use cmd/fontgallery to eyeball; make the width and coverage tests pass for `block`. Design: this is visual design work — uppercase-only; even strokes; aligned baselines; every row of a glyph the SAME display width (enforced by the width test). cfonts block/simpleBlock may serve as a shape reference, but verify the licence before copying anything (design '## provenance'). Acceptance: gallery shows a polished `block`; width + coverage green for `block`; its golden snapshot is generated. Do not tick tasks.md.",
+      "assignee": "UI",
+      "isDone": false,
+      "order": 131072,
+      "createdAt": "2026-06-19T06:35:14.477173999Z",
+      "updatedAt": "2026-06-19T06:35:14.477173999Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-8211",
+      "title": "Author the heavy (solid) font glyphs",
+      "description": "Context: refine-fonts-and-palette design.md '## The 3 fonts', tasks 2.3. `heavy` is the solid, filled, loudest face; it is now a hand-authored static map and no longer derived from go-figure banner3. Outcome: `heavy` renders the full charset as a maximally bold solid-block figure that is still legible (do not fill to mush). Files \u0026 scope: only the `heavy` glyph map in internal/font/; eyeball in the gallery; make width + coverage pass for `heavy`. Design: visual design work, uppercase-only, equal-width rows per glyph; aim for the boldest of the three while keeping letterforms distinguishable. Acceptance: gallery shows a polished `heavy`; width + coverage green for `heavy`; golden snapshot generated. Do not tick tasks.md.",
+      "assignee": "UI",
+      "isDone": false,
+      "order": 196608,
+      "createdAt": "2026-06-19T06:35:14.477175258Z",
+      "updatedAt": "2026-06-19T06:35:14.477175258Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-9b22",
+      "title": "Author the compact (half-block) font glyphs",
+      "description": "Context: refine-fonts-and-palette design.md '## The 3 fonts' and '## provenance', tasks 2.4-2.5. `compact` is a 3-row half-block face (using ▀ ▄ █) — dense, for short or narrow panes. Outcome: `compact` renders the full charset legibly in 3 rows; glyphs may be transcribed from the TOIlet `pagga` .tlf where it fits. Files \u0026 scope: only the `compact` glyph map in internal/font/; record provenance + licence for any transcribed glyphs in a header comment and/or NOTICE; eyeball in the gallery. Design: verify pagga's licence BEFORE copying any glyph; uppercase-only; equal-width rows per glyph; keep it readable despite the reduced height. Acceptance: gallery shows a polished `compact`; width + coverage green for `compact`; golden snapshot generated; provenance recorded. Do not tick tasks.md.",
+      "assignee": "UI",
+      "isDone": false,
+      "order": 262144,
+      "createdAt": "2026-06-19T06:35:14.477176376Z",
+      "updatedAt": "2026-06-19T06:35:14.477176376Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-f0ee",
+      "title": "Remove FIGlet fonts and the go-figure dependency",
+      "description": "Context: refine-fonts-and-palette tasks 2.6-2.7. With all three fonts now static hand maps (previous laps), the go-figure machinery is dead. Outcome: only block/heavy/compact are registered; internal/font/figlet.go and its mappedFiglet/figletFont machinery are deleted; go-figure is absent from go.mod/go.sum and the dependency graph; existing font tests are updated so the build and tests stay green. Files \u0026 scope: delete internal/font/figlet.go; internal/font/registry.go (register only the three); internal/font/registry_test.go (TestNamesIncludeExpected hardcodes standard/slant/cyberlarge — change to block/heavy/compact; fix comments mentioning go-figure-backed fonts); go.mod/go.sum via `go mod tidy`; refresh golden snapshots. Design: do the test fixes in the SAME lap as the figlet.go deletion so the tree never has a red build between laps. Acceptance: `go build ./...` and `go test ./internal/font/...` green; go-figure not in go.mod; font.Names() returns exactly block, heavy, compact (default first). Do not tick tasks.md.",
+      "assignee": "JUNIOR",
+      "isDone": false,
+      "order": 327680,
+      "createdAt": "2026-06-19T06:35:14.477177264Z",
+      "updatedAt": "2026-06-19T06:35:14.477177264Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-f6f8",
+      "title": "Verify the fonts phase",
+      "description": "Use the openspec-verify-change skill against refine-fonts-and-palette, focused on the `fonts` capability (specs/fonts/spec.md). Confirm: exactly three fonts; uppercase coverage with equal-width rows (verified via glyph map keys, not rendered output); no runtime go-figure or rasterization; the gallery and golden/width/coverage harness present and green. Before any diff, identify the intended merge target from the user, PR metadata, repo docs, or recent history — do NOT assume main — then use `git diff \u003ctarget\u003e...HEAD`; identify this batch's first lap (the font-gallery lap) and treat earlier branch work as pre-existing; never rewrite git history. Trace the actual registered fonts and the deleted go-figure import, not just that tests pass. Check off the §1 and §2 tasks.md boxes only for work verified correct and thorough; for any substantive gap, add a focused head lap (`laps add head`) rather than fixing large work here.",
+      "assignee": "VERIFY",
+      "isDone": false,
+      "order": 393216,
+      "createdAt": "2026-06-19T06:35:14.477180787Z",
+      "updatedAt": "2026-06-19T06:35:14.477180787Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-939d",
+      "title": "Add the semantic adaptive colour palette",
+      "description": "Context: refine-fonts-and-palette tasks 3.1-3.2 and design '## Colours'. Outcome: internal/cmd/styles.go exposes exactly five named colours — alert (red), warn (amber), info (teal, default), ok (green), focus (magenta) — each a lipgloss.AdaptiveColor with Light and Dark variants tuned for contrast on both backgrounds; info is the default; the old ten presets are gone. Files \u0026 scope: internal/cmd/styles.go (+ its test). Replace presetOrder with the new five-name slice but KEEP a symbol of that same name — root.go:36 (flag help) and root.go:75 (error message) interpolate presetOrder, so renaming it breaks the build. Design: colour judgment — each Light/Dark pair must stay legible on both light and dark terminals (the old presets were single hexes that washed out); keep the current adaptive teal as `info`. Acceptance: presetColor resolves adaptive pairs for the five names; a quick render check; styles test updated. Do not tick tasks.md.",
+      "assignee": "UI",
+      "isDone": false,
+      "order": 458752,
+      "createdAt": "2026-06-19T06:35:14.477181972Z",
+      "updatedAt": "2026-06-19T06:35:14.477181972Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-0c23",
+      "title": "Source-aware hard-error resolution, parseColor, and did-you-mean",
+      "description": "Context: refine-fonts-and-palette tasks 3.3, 4.1-4.3 and design '## Migration'. THIS IS THE SHARED SEAM with style-config-ergonomics — structure it per-source. Outcome: resolveStyle/RunE reject an unknown named font or colour coming from a CLI FLAG or the CONFIG FILE with a non-zero exit and a message that lists the valid names plus a 'did you mean X' near-match suggestion; parseColor accepts the five presets, hex, and ANSI index. Validation is per-source so a later change can make env/session layers WARN instead of erroring. Files \u0026 scope: internal/cmd/root.go (resolveStyle, RunE, parseColor) and a small edit-distance suggest helper. Do NOT add env or session layers here (that is the next change). Design: reject BEFORE font.Get's silent fallback; resolveStyle must know each value's origin (flag vs config) to choose fail-vs-(future)warn; hard-error for both flags and the config file (the config picker's tolerance is a separate path handled in a later lap). Acceptance: unknown --font/--color and unknown config values exit non-zero, list options, and suggest a near-match; valid preset/hex/ANSI still succeed; tests cover each. Do not tick tasks.md.",
+      "assignee": "SENIOR",
+      "isDone": false,
+      "order": 524288,
+      "createdAt": "2026-06-19T06:35:14.477182821Z",
+      "updatedAt": "2026-06-19T06:35:14.477182821Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-6ec3",
+      "title": "Verify colour and resolution slice",
+      "description": "The previous lap changed the shared resolveStyle contract (high-risk), so verify promptly. Use the openspec-verify-change skill against refine-fonts-and-palette, focused on the `colors` capability (specs/colors/spec.md) and the hard-error requirements in the fonts/colors specs. Confirm: five adaptive presets plus the hex/ANSI escape hatch; an unknown name from a flag or the config file is a hard error listing options and suggesting a near-match; and the resolution code is structured per-source so the env/session warn path can build on it. Identify the merge target (do not assume main) and the batch's first lap before diffing; do not rewrite history; trace the actual error paths, not just green tests. Check off the §3 and §4 tasks.md boxes verified done; add a head lap for any gap.",
+      "assignee": "VERIFY",
+      "isDone": false,
+      "order": 589824,
+      "createdAt": "2026-06-19T06:35:14.477183653Z",
+      "updatedAt": "2026-06-19T06:35:14.477183653Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-a613",
+      "title": "Update stale strings and config picker tolerance",
+      "description": "Context: refine-fonts-and-palette tasks 3.4, 5.1-5.2. Outcome: (a) literal strings that do not self-update are corrected — root.go Long and Example (old preset list, --font slant), config.Template comments in internal/config/config.go, and the config.go default labels (colorDefaultChoice 'adaptive teal', configSummary 'teal' fallback); (b) the interactive `plaqq config` picker tolerates an invalid stored font/colour by seeding it as the default (block / info) instead of erroring, and fontOptions/colorOptions are updated to the new sets. Files \u0026 scope: internal/cmd/root.go (help text only), internal/cmd/config.go, internal/config/config.go. Design: keep the render-time hard-error from the previous lap intact — the picker is the tolerant repair path, a different code path. Acceptance: all help/template/label strings reference only block/heavy/compact and the five semantic colours; the picker opens with defaults when a stored value is unknown and saves only valid values; a picker test is added. Do not tick tasks.md.",
+      "assignee": "JUNIOR",
+      "isDone": false,
+      "order": 655360,
+      "createdAt": "2026-06-19T06:35:14.477185551Z",
+      "updatedAt": "2026-06-19T06:35:14.477185551Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-7444",
+      "title": "Docs for the refined fonts and palette",
+      "description": "Context: refine-fonts-and-palette tasks 6.1-6.2. Outcome: README.md documents the three fonts, the semantic adaptive palette, the hex/ANSI escape hatch, and the hard-error-on-unknown-name behaviour; AGENTS.md describes the font architecture and the removal of go-figure/FIGlet; the breaking removals (FIGlet font names and the old presets) are noted in the changelog/release notes. Files \u0026 scope: README.md, AGENTS.md, changelog. Design: do NOT bump the VERSION file — a VERSION change triggers the auto-tag release workflow; the release is a separate deliberate step. Acceptance: docs match the implemented behaviour; VERSION is unchanged. Do not tick tasks.md.",
+      "assignee": "JUNIOR",
+      "isDone": false,
+      "order": 720896,
+      "createdAt": "2026-06-19T06:35:14.47718648Z",
+      "updatedAt": "2026-06-19T06:35:14.47718648Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-2699",
+      "title": "Final verification: refine-fonts-and-palette",
+      "description": "Full-change verification that closes refine-fonts-and-palette before the style-config laps begin. Use the openspec-verify-change skill across the entire change and inspect the whole batch diff. First identify the intended merge target from the user/PR/repo history (do NOT assume main) and the batch's first lap (the font-gallery lap), treating earlier branch work as pre-existing; never rewrite git history. Run a gofmt check, `go vet ./...`, `go build ./...`, and `go test ./...`; run cmd/fontgallery and confirm all three fonts read well; run `openspec validate refine-fonts-and-palette --strict`. Check off every remaining tasks.md box you verify as correctly and thoroughly done; for any gap, add a focused head lap. Confirm the working tree now matches the post-refine end-state that the style-config-ergonomics laps assume (three fonts, five presets, go-figure gone).",
+      "assignee": "VERIFY",
+      "isDone": false,
+      "order": 786432,
+      "createdAt": "2026-06-19T06:35:14.477187288Z",
+      "updatedAt": "2026-06-19T06:35:14.477187288Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-f885",
+      "title": "Add the per-terminal session-state store",
+      "description": "Context: first style-config-ergonomics lap (openspec/changes/style-config-ergonomics/ — read design.md '## session-state file' and tasks 2.1, 2.3). Assumes refine-fonts-and-palette has landed (three fonts, five presets). Outcome: a small store (e.g. internal/session) that persists at least font and colour for the current terminal session, keyed by os.Getppid(), under $XDG_RUNTIME_DIR/plaqq/ with an os.TempDir() fallback; Load/Save/Clear; written atomically (temp file + rename, mode 0600); a malformed or invalid record is ignored with a warning and never blocks. Files \u0026 scope: new internal/session package plus unit tests; no resolveStyle wiring yet (next lap). Design: PPID is the zero-dep 'this shell' key — document the PID-reuse caveat in a comment; atomic write matters (this repo has prior ETXTBSY/atomic-install lessons); mode 0600. Acceptance: Save then Load round-trips; Clear removes; distinct keys isolate; a malformed file yields warn + empty with no error. Do not tick tasks.md.",
+      "assignee": "SENIOR",
+      "isDone": false,
+      "order": 851968,
+      "createdAt": "2026-06-19T06:35:14.477188082Z",
+      "updatedAt": "2026-06-19T06:35:14.477188082Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-6526",
+      "title": "Wire env and session-state layers into resolveStyle (warn, source-aware)",
+      "description": "Context: style-config-ergonomics tasks 1.1-1.4, 2.2-2.3 and design '## precedence' and '## strictness'. Builds directly on refine's source-aware resolveStyle. HIGH-RISK shared seam. Outcome: resolveStyle reads PLAQQ_COLOR/FONT/BOLD/HINT/NO_HINT between the config and session layers, and reads the session-state record (from the previous lap) as the layer above env and below flags; final precedence is defaults \u003c config \u003c env \u003c session-state \u003c flags, resolved per setting independently. A bad env or session value WARNS to stderr (naming the variable) and falls through — it never aborts; flags and the config file still hard-error. Warnings are emitted before BOTH the interactive form and the alt-screen program (do not defer them on a channel like the update-notice at root.go:252). Files \u0026 scope: internal/cmd/root.go (resolveStyle + warning emission) and a small env parser; use strconv.ParseBool for the bool vars. Design: reuse the per-source validation structure from refine — env/session take the warn branch, flag/config the error branch; session-state sits above env so a customise choice is authoritative for the session. Acceptance: tests for each var applying; precedence flag\u003esession\u003eenv\u003econfig\u003edefault and per-setting independence; an invalid env or session value warns to stderr and the notice still renders from the fallback. Do not tick tasks.md.",
+      "assignee": "SENIOR",
+      "isDone": false,
+      "order": 917504,
+      "createdAt": "2026-06-19T06:35:14.477188871Z",
+      "updatedAt": "2026-06-19T06:35:14.477188871Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-7322",
+      "title": "Verify resolution layering",
+      "description": "The previous lap reworked the shared resolveStyle contract (high-risk), so verify promptly. Use the openspec-verify-change skill against style-config-ergonomics, focused on the style-resolution spec: env vars apply; bad env/session values warn and fall through rather than abort; session-state precedence sits above env and below flags; warnings are emitted before the form and the alt-screen program. Identify the merge target (do not assume main) and the batch's first lap (the session-store lap) before diffing; do not rewrite history; trace the actual warn-vs-error branches, not just green tests. Check off the §1 and §2 tasks.md boxes verified done; add a head lap for any gap.",
+      "assignee": "VERIFY",
+      "isDone": false,
+      "order": 983040,
+      "createdAt": "2026-06-19T06:35:14.477191858Z",
+      "updatedAt": "2026-06-19T06:35:14.477191858Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-024a",
+      "title": "Add plaqq config --session and --clear",
+      "description": "Context: style-config-ergonomics tasks 3.1-3.2. Outcome: `plaqq config --session` writes the current terminal's session-state record (from --color/--font if given, otherwise via the interactive picker), and `plaqq config --session --clear` removes it; no eval or shell integration is required because plaqq reads its own session-state file. Files \u0026 scope: internal/cmd/config.go (wire the flags to the internal/session store from an earlier lap). Design: reuse the tolerant picker so an invalid existing session/config value seeds as the default rather than erroring. Acceptance: `--session --color/--font` writes the record and a subsequent plaqq uses it; `--clear` removes it; tests cover both paths. Do not tick tasks.md.",
+      "assignee": "JUNIOR",
+      "isDone": false,
+      "order": 1048576,
+      "createdAt": "2026-06-19T06:35:14.47719374Z",
+      "updatedAt": "2026-06-19T06:35:14.47719374Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-abb2",
+      "title": "Build the confirm/customise interactive flow",
+      "description": "Context: style-config-ergonomics tasks 4.1-4.5 and design '## Interactive flow' and '## Non-interactive'. This is a multi-state TUI flow. Outcome: bare `plaqq` (no message arg, interactive TTY) shows ONE huh.Form — group 1 is the message Input plus a Confirm/Customise Select (Confirm focused by default); group 2 is font + colour Selects shown via WithHideFunc only when Customise is chosen, each seeded from the resolved style. The user can navigate back (shift+tab) to edit the message after entering customise. Confirm renders with the resolved style; Customise writes the chosen font+colour to the session-state store AND renders this notice with them, so the next plaqq in that pane reuses them. `plaqq \"msg\"` (arg present) stays immediate. When there is no message arg and stdin is not an interactive TTY, or --json-output is set, exit via exit() with 'a message is required' instead of launching the form (this also fixes today's latent huh.NewInput hang under --json-output). Esc/Ctrl-C exits cleanly at every step. Files \u0026 scope: internal/cmd/root.go bare-invocation path; reuse internal/session and the config.go picker patterns; use golang.org/x/term.IsTerminal for the guard. Design: config.go already uses WithHideFunc on later groups — follow that pattern; seed the Select Value pointers from the resolved style before Run. Acceptance: manual TUI check of confirm, customise, and back-nav message edit; customise persists to the session (next plaqq reuses it); arg path immediate; the non-TTY/json guard errors cleanly; tests where feasible for the selection/persistence plumbing and the guard. Do not tick tasks.md.",
+      "assignee": "UI",
+      "isDone": false,
+      "order": 1114112,
+      "createdAt": "2026-06-19T06:35:14.477194551Z",
+      "updatedAt": "2026-06-19T06:35:14.477194551Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-5f26",
+      "title": "Verify interactive flow and session helper",
+      "description": "The interactive-flow lap touches a data path (session persistence) and the primary UX, so verify thoroughly. Use the openspec-verify-change skill against style-config-ergonomics, focused on the interactive-prompt spec: Confirm is the default fast path; Customise picks font+colour and sticks for the session while a separate pane is unaffected; back-navigation edits the message; the message-argument path is immediate; the non-interactive/json guard exits cleanly; aborting exits cleanly; plus `--session`/`--clear` from the prior lap. Identify the merge target (not assumed main) and the batch's first lap before diffing; do not rewrite history. Check off the §3 and §4 tasks.md boxes verified done; add a head lap for any gap.",
+      "assignee": "VERIFY",
+      "isDone": false,
+      "order": 1179648,
+      "createdAt": "2026-06-19T06:35:14.477198041Z",
+      "updatedAt": "2026-06-19T06:35:14.477198041Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-ea81",
+      "title": "Docs for per-pane styling and customise",
+      "description": "Context: style-config-ergonomics tasks 5.1-5.3. Outcome: README.md gains a precedence table (defaults to config to env to session to flags), the PLAQQ_* variables with their warn-on-bad behaviour, the per-pane recipes (`plaqq config --session ...`, the customise flow, and the manual `export` fallback), and the confirm/customise flow; AGENTS.md notes the env and session-state layers in resolveStyle, the --session helper, and the session-state store location/keying; and the docs clarify the PLAQQ_* style vars versus the pre-existing PLAQQ_CONFIG (file path, unrelated) and the session-above-env caveat with --clear reset. Files \u0026 scope: README.md, AGENTS.md. Design: do NOT bump VERSION (auto-tag releases on a VERSION bump). Acceptance: docs match the implemented behaviour; VERSION unchanged. Do not tick tasks.md.",
+      "assignee": "JUNIOR",
+      "isDone": false,
+      "order": 1245184,
+      "createdAt": "2026-06-19T06:35:14.477206448Z",
+      "updatedAt": "2026-06-19T06:35:14.477206448Z",
+      "completedAt": null
+    },
+    {
+      "id": "plaq-2556",
+      "title": "Final verification: style-config-ergonomics",
+      "description": "Full-change verification for style-config-ergonomics. Use the openspec-verify-change skill across the whole change and inspect the entire batch diff. First identify the intended merge target from the user/PR/repo history (do NOT assume main) and this batch's first lap (the session-store lap), treating earlier work — including the entire refine-fonts-and-palette change — as pre-existing baseline; never rewrite git history. Run a gofmt check, `go vet ./...`, `go build ./...`, and `go test ./...`; smoke-check that a bad PLAQQ_* warns and still renders, that customise in one pane sticks for that pane only, that back-navigation edits the message, and that `--session --clear` resets; run `openspec validate style-config-ergonomics --strict`. Check off every remaining tasks.md box verified done; add a focused head lap for any gap.",
+      "assignee": "VERIFY",
+      "isDone": false,
+      "order": 1310720,
+      "createdAt": "2026-06-19T06:35:14.477207342Z",
+      "updatedAt": "2026-06-19T06:35:14.477207342Z",
+      "completedAt": null
+    }
+  ]
 }
