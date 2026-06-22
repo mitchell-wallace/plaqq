@@ -8,11 +8,12 @@ It takes any custom notice text, renders it in a centered, chunky ASCII block fo
 
 ## Features
 
-- **Multiple Fonts**: Ships Unicode block faces (`block`, `heavy`, `compact`).
-- **Color Presets**: Pick a named color (`teal`, `coral`, `amber`, `lime`, `azure`, `violet`, `magenta`, `rose`, `crimson`, `slate`) or supply your own hex / ANSI value.
-- **Interactive Config Picker**: Run `plaqq config` (no subcommand) to edit your styling defaults in a friendly form.
+- **Three Fonts**: Ships three Unicode block faces: `block` (clean medium, default), `heavy` (solid filled block), and `compact` (dense 3-row half-block for tight spaces).
+- **Semantic Adaptive Palette**: Pick from five named semantic colors (`alert`, `warn`, `info` (default), `ok`, `focus`), each utilizing adaptive theme styling to look great on both light and dark terminal backgrounds.
+- **Escape Hatch**: Supply custom hex codes (e.g., `#00f5d4`) or ANSI color indexes (`0`-`255`) for personalized coloring.
+- **Strict Validation**: Invalid font or color preset names in CLI flags or config files trigger a non-zero exit status with a helpful suggestion message.
+- **Interactive Config Picker**: Run `plaqq config` (no subcommand) to edit your styling defaults in a friendly, interactive form (which tolerates invalid stored configurations for easy repair).
 - **Dynamic Centering & Word Wrapping**: Automatically wraps text to fit within your terminal pane margin and keeps the notice perfectly centered vertically and horizontally.
-- **Adaptive Theme Styling**: Looks great on both light and dark terminals using adaptive theme styling.
 - **Spacebar Dismissal**: Dismiss the overlay instantly by pressing `Space`.
 - **Background Update Notification**: Automatically checks for newer versions and alerts you when updates are available.
 
@@ -51,14 +52,14 @@ plaqq "remember to run e2e tests before pushing"
 
 The notice appearance can be customized with flags (run `plaqq -h` to see them all):
 
-*   **`--font`**: Font used to render the notice. Block faces: `block` (default), `heavy`, `compact`.
+*   **`--font`**: Font used to render the notice. Supported block faces: `block` (default), `heavy`, `compact`.
     ```bash
     plaqq --font heavy "shipped"
     plaqq --font compact "heads up"
     ```
-*   **`--color`**: Notice text color as a preset name (`teal`, `coral`, `amber`, `lime`, `azure`, `violet`, `magenta`, `rose`, `crimson`, `slate`), a hex code (`#00f5d4`), or an ANSI index (`0`-`255`). Defaults to an adaptive teal that suits both light and dark terminals.
+*   **`--color`**: Notice text color. Can be a semantic preset (`alert`, `warn`, `info`, `ok`, `focus`), a hex code (`#00f5d4`), or an ANSI index (`0`-`255`). Defaults to `info` (an adaptive teal).
     ```bash
-    plaqq --color coral "build failed"
+    plaqq --color alert "build failed"
     plaqq --color "#ff5f87" "build failed"
     plaqq --color 213 "heads up"
     ```
@@ -71,6 +72,16 @@ The notice appearance can be customized with flags (run `plaqq -h` to see them a
     ```bash
     plaqq --no-hint "stand clear"
     ```
+
+### Strict Validation
+
+If you specify an unknown named font or color preset (either via CLI flags or in the TOML configuration file), `plaqq` exits with a non-zero status and prints a list of valid choices along with a nearest-match suggestion if one exists:
+
+```
+plaqq: unknown font "heavyy" from --font flag: valid fonts are block, heavy, compact; did you mean "heavy"?
+```
+
+**Exception**: The interactive config picker (`plaqq config`) is designed to tolerate invalid config files so that it remains usable as a repair path. It seeds invalid values with defaults, allowing you to select and save valid choices.
 
 ### Persistent Configuration
 
@@ -89,7 +100,7 @@ The file lives at `$XDG_CONFIG_HOME/plaqq/config.toml` (typically `~/.config/pla
 A config file looks like:
 
 ```toml
-color = "coral"
+color = "alert"
 font = "heavy"
 bold = true
 hint = "press space"
