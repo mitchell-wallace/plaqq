@@ -7,35 +7,35 @@ Ordered so the preview/test tooling lands before glyph authoring.
 
 ## 1. Tooling first (so glyphs can be seen & regression-guarded)
 
-- [ ] 1.1 Add `cmd/fontgallery/main.go` — headless, stdout-only: render a fixed
+- [x] 1.1 Add `cmd/fontgallery/main.go` — headless, stdout-only: render a fixed
   sample (`SHIP IT! BUILD FAILED 0123`) in every font, then a full-charset dump
   per font. No TTY, no Bubble Tea.
-- [ ] 1.2 Add golden snapshot tests: freeze each font's full-charset render to
+- [x] 1.2 Add golden snapshot tests: freeze each font's full-charset render to
   `internal/font/testdata/<name>.golden`; compare in `TestFontGolden`, with an
   `-update` flag to regenerate.
-- [ ] 1.3 Extend `TestBlockRowWidths` to assert the equal-width invariant across
+- [x] 1.3 Extend `TestBlockRowWidths` to assert the equal-width invariant across
   all three fonts' full charsets.
 
 ## 2. Fonts: cut to three, uppercase-only, static maps
 
-- [ ] 2.1 Define the uppercase charset constant (`A–Z 0–9 ! ? . , : ; ' - / & % ( )`
+- [x] 2.1 Define the uppercase charset constant (`A–Z 0–9 ! ? . , : ; ' - / & % ( )`
   + space) and a coverage test asserting every font's glyph **map keys** include
   every charset rune (assert against the map, not rendered output — `?` is also
   the not-found marker, so checking output would false-positive).
-- [ ] 2.2 Re-author `block` (clean medium) glyph map; verify in the gallery.
-- [ ] 2.3 Re-author `heavy` (solid filled) glyph map by hand (no longer derived
+- [x] 2.2 Re-author `block` (clean medium) glyph map; verify in the gallery.
+- [x] 2.3 Re-author `heavy` (solid filled) glyph map by hand (no longer derived
   from banner3); verify in the gallery.
-- [ ] 2.4 Re-author `compact` (3-row half-block) glyph map, transcribing from
+- [x] 2.4 Re-author `compact` (3-row half-block) glyph map, transcribing from
   TOIlet `pagga` where it fits; verify in the gallery.
-- [ ] 2.5 Record provenance + licence for any transcribed glyphs (header comment
+- [x] 2.5 Record provenance + licence for any transcribed glyphs (header comment
   / `NOTICE`); confirm each source's licence before copying.
-- [ ] 2.6 Delete `internal/font/figlet.go` and any `mappedFiglet`/`figletFont`
+- [x] 2.6 Delete `internal/font/figlet.go` and any `mappedFiglet`/`figletFont`
   machinery; update the registry to register only the three fonts. In the **same
   step**, fix the existing font tests that hardcode removed names
   (`registry_test.go` `TestNamesIncludeExpected` lists `standard`/`slant`/
   `cyberlarge`; comments referencing "go-figure-backed" fonts) so the build/tests
   stay green before the next task.
-- [ ] 2.7 Remove `go-figure` from `go.mod`/`go.sum` (`go mod tidy`); confirm it's
+- [x] 2.7 Remove `go-figure` from `go.mod`/`go.sum` (`go mod tidy`); confirm it's
   gone from the dependency graph.
 
 ## 3. Colours: 5 semantic adaptive presets

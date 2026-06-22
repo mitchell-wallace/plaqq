@@ -4,11 +4,14 @@ import "testing"
 
 func TestNamesIncludeExpected(t *testing.T) {
 	got := Names()
-	if len(got) == 0 || got[0] != DefaultName {
-		t.Fatalf("Names()[0] = %v; want %q first", got, DefaultName)
-	}
 	want := []string{"block", "compact", "heavy"}
-	for _, w := range want {
+	if len(got) != len(want) {
+		t.Fatalf("Names() = %v; want exactly %v", got, want)
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Fatalf("Names() = %v; want exactly %v", got, want)
+		}
 		if !Has(w) {
 			t.Errorf("expected font %q to be registered; Names()=%v", w, got)
 		}
@@ -65,4 +68,3 @@ func TestBlockRowWidths(t *testing.T) {
 		})
 	}
 }
-
