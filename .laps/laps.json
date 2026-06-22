@@ -60,11 +60,11 @@
       "title": "Remove FIGlet fonts and the go-figure dependency",
       "description": "Context: refine-fonts-and-palette tasks 2.6-2.7. With all three fonts now static hand maps (previous laps), the go-figure machinery is dead. Outcome: only block/heavy/compact are registered; internal/font/figlet.go and its mappedFiglet/figletFont machinery are deleted; go-figure is absent from go.mod/go.sum and the dependency graph; existing font tests are updated so the build and tests stay green. Files \u0026 scope: delete internal/font/figlet.go; internal/font/registry.go (register only the three); internal/font/registry_test.go (TestNamesIncludeExpected hardcodes standard/slant/cyberlarge — change to block/heavy/compact; fix comments mentioning go-figure-backed fonts); go.mod/go.sum via `go mod tidy`; refresh golden snapshots. Design: do the test fixes in the SAME lap as the figlet.go deletion so the tree never has a red build between laps. Acceptance: `go build ./...` and `go test ./internal/font/...` green; go-figure not in go.mod; font.Names() returns exactly block, heavy, compact (default first). Do not tick tasks.md.",
       "assignee": "JUNIOR",
-      "isDone": false,
+      "isDone": true,
       "order": 327680,
       "createdAt": "2026-06-19T06:35:14.477177264Z",
-      "updatedAt": "2026-06-19T06:35:14.477177264Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T08:35:41.595719377Z",
+      "completedAt": "2026-06-22T08:35:41.595719377Z"
     },
     {
       "id": "plaq-f6f8",
