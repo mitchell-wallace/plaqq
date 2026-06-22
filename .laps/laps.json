@@ -170,11 +170,11 @@
       "title": "Verify resolution layering",
       "description": "The previous lap reworked the shared resolveStyle contract (high-risk), so verify promptly. Use the openspec-verify-change skill against style-config-ergonomics, focused on the style-resolution spec: env vars apply; bad env/session values warn and fall through rather than abort; session-state precedence sits above env and below flags; warnings are emitted before the form and the alt-screen program. Identify the merge target (do not assume main) and the batch's first lap (the session-store lap) before diffing; do not rewrite history; trace the actual warn-vs-error branches, not just green tests. Check off the §1 and §2 tasks.md boxes verified done; add a head lap for any gap.",
       "assignee": "VERIFY",
-      "isDone": false,
+      "isDone": true,
       "order": 983040,
       "createdAt": "2026-06-19T06:35:14.477191858Z",
-      "updatedAt": "2026-06-19T06:35:14.477191858Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T09:57:34.195229836Z",
+      "completedAt": "2026-06-22T09:57:34.195229836Z"
     },
     {
       "id": "plaq-024a",
