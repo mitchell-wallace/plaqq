@@ -104,11 +104,11 @@
       "title": "Verify colour and resolution slice",
       "description": "The previous lap changed the shared resolveStyle contract (high-risk), so verify promptly. Use the openspec-verify-change skill against refine-fonts-and-palette, focused on the `colors` capability (specs/colors/spec.md) and the hard-error requirements in the fonts/colors specs. Confirm: five adaptive presets plus the hex/ANSI escape hatch; an unknown name from a flag or the config file is a hard error listing options and suggesting a near-match; and the resolution code is structured per-source so the env/session warn path can build on it. Identify the merge target (do not assume main) and the batch's first lap before diffing; do not rewrite history; trace the actual error paths, not just green tests. Check off the §3 and §4 tasks.md boxes verified done; add a head lap for any gap.",
       "assignee": "VERIFY",
-      "isDone": false,
+      "isDone": true,
       "order": 589824,
       "createdAt": "2026-06-19T06:35:14.477183653Z",
-      "updatedAt": "2026-06-19T06:35:14.477183653Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T09:21:34.220990581Z",
+      "completedAt": "2026-06-22T09:21:34.220990581Z"
     },
     {
       "id": "plaq-a613",
