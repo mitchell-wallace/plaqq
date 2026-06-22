@@ -82,11 +82,11 @@
       "title": "Add the semantic adaptive colour palette",
       "description": "Context: refine-fonts-and-palette tasks 3.1-3.2 and design '## Colours'. Outcome: internal/cmd/styles.go exposes exactly five named colours — alert (red), warn (amber), info (teal, default), ok (green), focus (magenta) — each a lipgloss.AdaptiveColor with Light and Dark variants tuned for contrast on both backgrounds; info is the default; the old ten presets are gone. Files \u0026 scope: internal/cmd/styles.go (+ its test). Replace presetOrder with the new five-name slice but KEEP a symbol of that same name — root.go:36 (flag help) and root.go:75 (error message) interpolate presetOrder, so renaming it breaks the build. Design: colour judgment — each Light/Dark pair must stay legible on both light and dark terminals (the old presets were single hexes that washed out); keep the current adaptive teal as `info`. Acceptance: presetColor resolves adaptive pairs for the five names; a quick render check; styles test updated. Do not tick tasks.md.",
       "assignee": "UI",
-      "isDone": false,
+      "isDone": true,
       "order": 458752,
       "createdAt": "2026-06-19T06:35:14.477181972Z",
-      "updatedAt": "2026-06-19T06:35:14.477181972Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T09:06:41.268902288Z",
+      "completedAt": "2026-06-22T09:06:41.268902288Z"
     },
     {
       "id": "plaq-0c23",
