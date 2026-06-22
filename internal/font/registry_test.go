@@ -39,18 +39,30 @@ func TestEveryFontRenders(t *testing.T) {
 	}
 }
 
+const Charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?.,:;'-/&%() "
+
 // TestBlockRowWidths enforces the per-glyph equal-width invariant the renderer
 // relies on for the hand-authored block fonts.
 func TestBlockRowWidths(t *testing.T) {
-	for r, rows := range compactGlyphs {
-		w := -1
-		for i, row := range rows {
-			n := len([]rune(row))
-			if w == -1 {
-				w = n
-			} else if n != w {
-				t.Errorf("compact glyph %q row %d width %d; want %d", string(r), i, n, w)
+	for _, name := range []string{"block", "heavy", "compact"} {
+		t.Run(name, func(t *testing.T) {
+			f := Get(name)
+			for _, r := range Charset {
+				rows := f.Render(string(r))
+				if len(rows) == 0 {
+					continue
+				}
+				w := -1
+				for i, row := range rows {
+					n := len([]rune(row))
+					if w == -1 {
+						w = n
+					} else if n != w {
+						t.Errorf("font %q glyph %q row %d width %d; want %d", name, string(r), i, n, w)
+					}
+				}
 			}
-		}
+		})
 	}
 }
+
