@@ -148,6 +148,7 @@ Since children cannot alter their parent shell's environment variables, `plaqq` 
 
 - **Storage**: Written as TOML to `$XDG_RUNTIME_DIR/plaqq/` (or fallback temp folder) with restricted permissions (`0600`). It is automatically cleaned up when the user logs out.
 - **Precedence Caveat**: Session state sits **above** environment variables. If you customize the session or set session state, a later `export PLAQQ_COLOR=...` in the same terminal pane will be overridden by the session state. Run `plaqq config --session --clear` to clear the session state and allow environment variables to take effect again.
+- **Release Note**: These style-config ergonomics changes do not bump `VERSION`. Plaqq's auto-tagged releases only cut when the `VERSION` file changes.
 
 #### Per-Pane Recipes
 

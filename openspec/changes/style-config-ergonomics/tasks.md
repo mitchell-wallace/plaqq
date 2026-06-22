@@ -62,20 +62,20 @@
 
 ## 5. Docs
 
-- [ ] 5.1 README: precedence table (defaults → config → env → session → flags),
+- [x] 5.1 README: precedence table (defaults → config → env → session → flags),
   the `PLAQQ_*` vars and warn-on-bad behaviour, the per-pane recipes
   (`plaqq config --session …`, customise, and manual `export` fallback), and the
   confirm/customise flow.
-- [ ] 5.2 AGENTS.md: note the env + session-state layers in `resolveStyle`, the
+- [x] 5.2 AGENTS.md: note the env + session-state layers in `resolveStyle`, the
   `--session` helper, and the session-state store location/keying.
-- [ ] 5.3 Docs: clarify `PLAQQ_*` style vars vs the pre-existing `PLAQQ_CONFIG`
+- [x] 5.3 Docs: clarify `PLAQQ_*` style vars vs the pre-existing `PLAQQ_CONFIG`
   (file path, unrelated), and the session-above-env caveat + `--clear` reset. Note
   this change does **not** bump `VERSION` (auto-tag releases on a VERSION bump).
 
 ## 6. Validate
 
-- [ ] 6.1 `gofmt -w`, `go vet ./...`, `go build ./...`, `go test ./...` green.
-- [ ] 6.2 Manual: bad `PLAQQ_*` warns + still renders; customise in one pane
+- [x] 6.1 `gofmt -w`, `go vet ./...`, `go build ./...`, `go test ./...` green.
+- [x] 6.2 Manual: bad `PLAQQ_*` warns + still renders; customise in one pane
   sticks for that pane only; back-navigation edits the message; `--session
   --clear` resets.
-- [ ] 6.3 `openspec validate style-config-ergonomics --strict`.
+- [x] 6.3 `openspec validate style-config-ergonomics --strict`.

@@ -194,6 +194,57 @@ func TestConfigSessionClear(t *testing.T) {
 	}
 }
 
+func TestConfigSessionClearIgnoresBrokenPersistentConfig(t *testing.T) {
+	configDir := t.TempDir()
+	t.Setenv("PLAQQ_CONFIG", filepath.Join(configDir, "config.toml"))
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	resetConfigFlags()
+
+	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte("[[broken\n"), 0o644); err != nil {
+		t.Fatalf("write broken config: %v", err)
+	}
+	if err := session.Save(session.State{Color: "focus", Font: "compact"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"config", "--session", "--clear"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("config --session --clear with broken config: %v", err)
+	}
+
+	state, err := session.Load(nil)
+	if err != nil {
+		t.Fatalf("session Load: %v", err)
+	}
+	if !state.Empty() {
+		t.Errorf("expected empty session state after clear, got %+v", state)
+	}
+}
+
+func TestConfigSessionSetIgnoresBrokenPersistentConfig(t *testing.T) {
+	configDir := t.TempDir()
+	t.Setenv("PLAQQ_CONFIG", filepath.Join(configDir, "config.toml"))
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	resetConfigFlags()
+
+	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte("[[broken\n"), 0o644); err != nil {
+		t.Fatalf("write broken config: %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"config", "--session", "--color", "alert", "--font", "heavy"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("config --session with broken config: %v", err)
+	}
+
+	state, err := session.Load(nil)
+	if err != nil {
+		t.Fatalf("session Load: %v", err)
+	}
+	if state.Color != "alert" || state.Font != "heavy" {
+		t.Errorf("expected alert/heavy session state, got %+v", state)
+	}
+}
+
 func TestConfigValidationErrors(t *testing.T) {
 	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "config.toml"))
 	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())

@@ -45,15 +45,6 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 			}
 		}
 
-		path, err := config.Path()
-		if err != nil {
-			return err
-		}
-		cfg, err := config.Load(path)
-		if err != nil {
-			return err
-		}
-
 		if flagSession {
 			if flagConfigClear {
 				if err := session.Clear(); err != nil {
@@ -130,6 +121,14 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 			}
 
 			// Otherwise, run the picker seeded with current session state (or fallback config)
+			path, err := config.Path()
+			if err != nil {
+				return err
+			}
+			cfg, err := config.Load(path)
+			if err != nil {
+				return err
+			}
 			sessState, err := session.Load(styleWarningOutput)
 			if err == nil {
 				if sessState.Color != "" {
@@ -139,6 +138,15 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 					cfg.Font = &sessState.Font
 				}
 			}
+		}
+
+		path, err := config.Path()
+		if err != nil {
+			return err
+		}
+		cfg, err := config.Load(path)
+		if err != nil {
+			return err
 		}
 
 		if jsonOutput {
