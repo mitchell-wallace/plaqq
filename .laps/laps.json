@@ -49,11 +49,11 @@
       "title": "Author the compact (half-block) font glyphs",
       "description": "Context: refine-fonts-and-palette design.md '## The 3 fonts' and '## provenance', tasks 2.4-2.5. `compact` is a 3-row half-block face (using ▀ ▄ █) — dense, for short or narrow panes. Outcome: `compact` renders the full charset legibly in 3 rows; glyphs may be transcribed from the TOIlet `pagga` .tlf where it fits. Files \u0026 scope: only the `compact` glyph map in internal/font/; record provenance + licence for any transcribed glyphs in a header comment and/or NOTICE; eyeball in the gallery. Design: verify pagga's licence BEFORE copying any glyph; uppercase-only; equal-width rows per glyph; keep it readable despite the reduced height. Acceptance: gallery shows a polished `compact`; width + coverage green for `compact`; golden snapshot generated; provenance recorded. Do not tick tasks.md.",
       "assignee": "UI",
-      "isDone": false,
+      "isDone": true,
       "order": 262144,
       "createdAt": "2026-06-19T06:35:14.477176376Z",
-      "updatedAt": "2026-06-19T06:35:14.477176376Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T08:26:28.937388407Z",
+      "completedAt": "2026-06-22T08:26:28.937388407Z"
     },
     {
       "id": "plaq-f0ee",
