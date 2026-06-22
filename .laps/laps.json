@@ -214,11 +214,11 @@
       "title": "Docs for per-pane styling and customise",
       "description": "Context: style-config-ergonomics tasks 5.1-5.3. Outcome: README.md gains a precedence table (defaults to config to env to session to flags), the PLAQQ_* variables with their warn-on-bad behaviour, the per-pane recipes (`plaqq config --session ...`, the customise flow, and the manual `export` fallback), and the confirm/customise flow; AGENTS.md notes the env and session-state layers in resolveStyle, the --session helper, and the session-state store location/keying; and the docs clarify the PLAQQ_* style vars versus the pre-existing PLAQQ_CONFIG (file path, unrelated) and the session-above-env caveat with --clear reset. Files \u0026 scope: README.md, AGENTS.md. Design: do NOT bump VERSION (auto-tag releases on a VERSION bump). Acceptance: docs match the implemented behaviour; VERSION unchanged. Do not tick tasks.md.",
       "assignee": "JUNIOR",
-      "isDone": false,
+      "isDone": true,
       "order": 1245184,
       "createdAt": "2026-06-19T06:35:14.477206448Z",
-      "updatedAt": "2026-06-19T06:35:14.477206448Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T10:52:44.093559317Z",
+      "completedAt": "2026-06-22T10:52:44.093559317Z"
     },
     {
       "id": "plaq-2556",
