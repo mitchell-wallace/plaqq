@@ -17,11 +17,11 @@
       "title": "Author the block (medium) font glyphs",
       "description": "Context: refine-fonts-and-palette design.md '## The 3 fonts' and '## Charset', tasks 2.2. `block` is the default workhorse and sets the authoring pattern the other two follow. Outcome: `block` renders every charset glyph as a clean, medium-weight, unmistakably legible block figure that reads at a glance across a terminal pane (plaqq's whole job is shouty attention alerts). Files \u0026 scope: only the `block` glyph map in internal/font/ (font.go/block.go area); use cmd/fontgallery to eyeball; make the width and coverage tests pass for `block`. Design: this is visual design work — uppercase-only; even strokes; aligned baselines; every row of a glyph the SAME display width (enforced by the width test). cfonts block/simpleBlock may serve as a shape reference, but verify the licence before copying anything (design '## provenance'). Acceptance: gallery shows a polished `block`; width + coverage green for `block`; its golden snapshot is generated. Do not tick tasks.md.",
       "assignee": "UI",
-      "isDone": false,
+      "isDone": true,
       "order": 131072,
       "createdAt": "2026-06-19T06:35:14.477173999Z",
-      "updatedAt": "2026-06-19T06:35:14.477173999Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T06:25:40.698578093Z",
+      "completedAt": "2026-06-22T06:25:40.698578093Z"
     },
     {
       "id": "plaq-8211",
