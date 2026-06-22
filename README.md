@@ -111,11 +111,13 @@ no_hint = false
 
 When determining the visual style (color, font, bold, hint, etc.) for a notice, `plaqq` resolves style properties by layering sources from lowest to highest priority:
 
-1. **Built-in Defaults** (e.g. `info` color, `block` font)
-2. **Config File** (located at the path printed by `plaqq config path`)
-3. **Session Environment Variables** (prefixed with `PLAQQ_*`, scoped to the current shell)
-4. **Session State** (per-pane styling set by customise/`--session` flags)
-5. **CLI Flags** (e.g., `--color`, `--font`, scoped to a single command execution)
+| Priority | Source | Scope | How to Configure / Set |
+| :--- | :--- | :--- | :--- |
+| **1 (Lowest)** | **Built-in Defaults** | Hardcoded | Fallback settings (e.g., `info` color, `block` font, bold enabled) |
+| **2** | **Config File** | User-wide | TOML file (check path with `plaqq config path` or edit with `plaqq config`) |
+| **3** | **Session Environment Variables** | Current shell process | Ambient `PLAQQ_*` environment variables (e.g., `export PLAQQ_COLOR=warn`) |
+| **4** | **Session State** | Current terminal pane | Set interactively via the "Customise" flow or via `plaqq config --session` |
+| **5 (Highest)** | **CLI Flags** | Single command execution | Command-line flags (e.g., `--color`, `--font`) |
 
 A command-line flag always overrides all other sources for that specific run.
 
