@@ -6,11 +6,11 @@
       "title": "Add font gallery and glyph test harness",
       "description": "Context: first lap of the refine-fonts-and-palette batch (openspec/changes/refine-fonts-and-palette/ — read design.md '## Authoring pipeline' and tasks 1.1-1.3, 2.1). This is the tooling that lets later laps SEE and regression-guard glyphs before any are authored. Outcome: a headless cmd/fontgallery prints to stdout (no TTY, no Bubble Tea) a fixed sample `SHIP IT! BUILD FAILED 0123` for every registered font plus a full-charset dump per font; a test harness exists with golden snapshots per font under internal/font/testdata (with an -update flag), an equal-width-rows invariant test across ALL fonts, and a charset-coverage test. Define the uppercase charset constant: A-Z 0-9 ! ? . , : ; ' - / \u0026 % ( ) and space. Files \u0026 scope: new cmd/fontgallery/main.go; internal/font/*_test.go (extend TestBlockRowWidths to every font); internal/font/testdata/. Do not author or change any glyphs yet. Design: the coverage test MUST assert against each font's glyph MAP KEYS, not rendered output — `?` is also block.go's not-found marker, so checking output would false-positive. Coverage/golden tests are expected to be RED until the authoring laps fill the charset; that red is the intended safety net. Acceptance: `go run ./cmd/fontgallery` prints all current fonts and charset dumps; `go build ./...` is green; new tests compile and run. Do not tick tasks.md boxes (only VERIFY does).",
       "assignee": "JUNIOR",
-      "isDone": false,
+      "isDone": true,
       "order": 65536,
       "createdAt": "2026-06-19T06:35:14.47716831Z",
-      "updatedAt": "2026-06-19T06:35:14.47716831Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T05:42:45.106733927Z",
+      "completedAt": "2026-06-22T05:42:45.106733927Z"
     },
     {
       "id": "plaq-3c04",
