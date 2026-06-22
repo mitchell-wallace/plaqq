@@ -159,11 +159,11 @@
       "title": "Wire env and session-state layers into resolveStyle (warn, source-aware)",
       "description": "Context: style-config-ergonomics tasks 1.1-1.4, 2.2-2.3 and design '## precedence' and '## strictness'. Builds directly on refine's source-aware resolveStyle. HIGH-RISK shared seam. Outcome: resolveStyle reads PLAQQ_COLOR/FONT/BOLD/HINT/NO_HINT between the config and session layers, and reads the session-state record (from the previous lap) as the layer above env and below flags; final precedence is defaults \u003c config \u003c env \u003c session-state \u003c flags, resolved per setting independently. A bad env or session value WARNS to stderr (naming the variable) and falls through — it never aborts; flags and the config file still hard-error. Warnings are emitted before BOTH the interactive form and the alt-screen program (do not defer them on a channel like the update-notice at root.go:252). Files \u0026 scope: internal/cmd/root.go (resolveStyle + warning emission) and a small env parser; use strconv.ParseBool for the bool vars. Design: reuse the per-source validation structure from refine — env/session take the warn branch, flag/config the error branch; session-state sits above env so a customise choice is authoritative for the session. Acceptance: tests for each var applying; precedence flag\u003esession\u003eenv\u003econfig\u003edefault and per-setting independence; an invalid env or session value warns to stderr and the notice still renders from the fallback. Do not tick tasks.md.",
       "assignee": "SENIOR",
-      "isDone": false,
+      "isDone": true,
       "order": 917504,
       "createdAt": "2026-06-19T06:35:14.477188871Z",
-      "updatedAt": "2026-06-19T06:35:14.477188871Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T09:53:28.429313819Z",
+      "completedAt": "2026-06-22T09:53:28.429313819Z"
     },
     {
       "id": "plaq-7322",
