@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/mitchell-wallace/plaqq/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -23,8 +25,26 @@ func newStyleFlagCmd() *cobra.Command {
 	return c
 }
 
+func isolateStyleResolution(t *testing.T, configPath string) {
+	t.Helper()
+	t.Setenv("PLAQQ_CONFIG", configPath)
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	for _, name := range []string{envColor, envFont, envBold, envHint, envNoHint} {
+		t.Setenv(name, "")
+	}
+}
+
+func captureStyleWarnings(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var warnings bytes.Buffer
+	prev := styleWarningOutput
+	styleWarningOutput = &warnings
+	t.Cleanup(func() { styleWarningOutput = prev })
+	return &warnings
+}
+
 func TestResolveStyleDefaults(t *testing.T) {
-	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "none.toml"))
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
 	cmd := newStyleFlagCmd()
 
 	s, err := resolveStyle(cmd)
@@ -42,7 +62,7 @@ func TestResolveStyleConfigThenFlagOverride(t *testing.T) {
 	if err := os.WriteFile(path, []byte("color = \"#aabbcc\"\nfont = \"heavy\"\nbold = false\nhint = \"cfg hint\"\nno_hint = true\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PLAQQ_CONFIG", path)
+	isolateStyleResolution(t, path)
 
 	// Config only: values come from the file.
 	cmd := newStyleFlagCmd()
@@ -76,7 +96,7 @@ func TestResolveStyleConfigThenFlagOverride(t *testing.T) {
 }
 
 func TestRunERejectsUnknownFontFlagBeforeFallback(t *testing.T) {
-	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "none.toml"))
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
 	cmd := newStyleFlagCmd()
 	if err := cmd.Flags().Set("font", "heavyy"); err != nil {
 		t.Fatal(err)
@@ -94,7 +114,7 @@ func TestRunERejectsUnknownFontFlagBeforeFallback(t *testing.T) {
 }
 
 func TestResolveStyleRejectsUnknownColorFlag(t *testing.T) {
-	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "none.toml"))
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
 	cmd := newStyleFlagCmd()
 	if err := cmd.Flags().Set("color", "infp"); err != nil {
 		t.Fatal(err)
@@ -118,7 +138,7 @@ func TestResolveStyleRejectsUnknownFontConfig(t *testing.T) {
 	if err := os.WriteFile(path, []byte("font = \"heavyy\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PLAQQ_CONFIG", path)
+	isolateStyleResolution(t, path)
 	cmd := newStyleFlagCmd()
 
 	_, err := resolveStyle(cmd)
@@ -137,7 +157,7 @@ func TestResolveStyleRejectsUnknownColorConfig(t *testing.T) {
 	if err := os.WriteFile(path, []byte("color = \"alret\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PLAQQ_CONFIG", path)
+	isolateStyleResolution(t, path)
 	cmd := newStyleFlagCmd()
 
 	_, err := resolveStyle(cmd)
@@ -151,6 +171,132 @@ func TestResolveStyleRejectsUnknownColorConfig(t *testing.T) {
 		"focus",
 		`did you mean "alert"?`,
 	)
+}
+
+func TestResolveStyleEnvVarsApply(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	t.Setenv(envColor, "alert")
+	t.Setenv(envFont, "heavy")
+	t.Setenv(envBold, "false")
+	t.Setenv(envHint, "env hint")
+	t.Setenv(envNoHint, "true")
+	cmd := newStyleFlagCmd()
+
+	s, err := resolveStyle(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := styleSettings{color: "alert", font: "heavy", bold: false, hint: "env hint", noHint: true}
+	if s != want {
+		t.Errorf("env style = %+v; want %+v", s, want)
+	}
+}
+
+func TestResolveStylePrecedenceAndPerSettingIndependence(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("color = \"warn\"\nfont = \"block\"\nbold = true\nhint = \"cfg hint\"\nno_hint = false\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	isolateStyleResolution(t, path)
+	t.Setenv(envColor, "alert")
+	t.Setenv(envFont, "heavy")
+	t.Setenv(envBold, "false")
+	t.Setenv(envHint, "env hint")
+	t.Setenv(envNoHint, "true")
+	if err := session.Save(session.State{Color: "ok", Font: "compact"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+
+	cmd := newStyleFlagCmd()
+	if err := cmd.Flags().Set("color", "focus"); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := resolveStyle(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := styleSettings{color: "focus", font: "compact", bold: false, hint: "env hint", noHint: true}
+	if s != want {
+		t.Errorf("layered style = %+v; want %+v", s, want)
+	}
+}
+
+func TestResolveStyleInvalidEnvWarnsAndFallsThrough(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("color = \"ok\"\nfont = \"compact\"\nbold = false\nhint = \"cfg hint\"\nno_hint = true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	isolateStyleResolution(t, path)
+	t.Setenv(envColor, "not-a-color")
+	t.Setenv(envFont, "slant")
+	t.Setenv(envBold, "maybe")
+	t.Setenv(envNoHint, "perhaps")
+	warnings := captureStyleWarnings(t)
+	cmd := newStyleFlagCmd()
+
+	s, err := resolveStyle(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := styleSettings{color: "ok", font: "compact", bold: false, hint: "cfg hint", noHint: true}
+	if s != want {
+		t.Errorf("invalid env fallback = %+v; want %+v", s, want)
+	}
+	warn := warnings.String()
+	for _, substr := range []string{envColor, envFont, envBold, envNoHint, "plaqq: warning"} {
+		if !strings.Contains(warn, substr) {
+			t.Fatalf("warnings %q do not contain %q", warn, substr)
+		}
+	}
+}
+
+func TestResolveStyleEmptyEnvFallsThroughWithoutWarning(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("color = \"ok\"\nfont = \"compact\"\nbold = false\nhint = \"cfg hint\"\nno_hint = true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	isolateStyleResolution(t, path)
+	warnings := captureStyleWarnings(t)
+	cmd := newStyleFlagCmd()
+
+	s, err := resolveStyle(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := styleSettings{color: "ok", font: "compact", bold: false, hint: "cfg hint", noHint: true}
+	if s != want {
+		t.Errorf("empty env fallback = %+v; want %+v", s, want)
+	}
+	if warnings.Len() != 0 {
+		t.Fatalf("empty env produced warnings: %s", warnings.String())
+	}
+}
+
+func TestResolveStyleInvalidSessionWarnsAndFallsThroughPerSetting(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	t.Setenv(envColor, "alert")
+	t.Setenv(envFont, "heavy")
+	if err := session.Save(session.State{Color: "nope", Font: "compact"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+	warnings := captureStyleWarnings(t)
+	cmd := newStyleFlagCmd()
+
+	s, err := resolveStyle(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := styleSettings{color: "alert", font: "compact", bold: true, hint: defaultHint, noHint: false}
+	if s != want {
+		t.Errorf("invalid session fallback = %+v; want %+v", s, want)
+	}
+	warn := warnings.String()
+	for _, substr := range []string{"session state color", `unknown color "nope"`, "plaqq: warning"} {
+		if !strings.Contains(warn, substr) {
+			t.Fatalf("warnings %q do not contain %q", warn, substr)
+		}
+	}
 }
 
 func TestParseColor(t *testing.T) {

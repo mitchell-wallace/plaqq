@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -14,14 +15,24 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mitchell-wallace/plaqq/internal/config"
 	"github.com/mitchell-wallace/plaqq/internal/font"
+	"github.com/mitchell-wallace/plaqq/internal/session"
 	"github.com/spf13/cobra"
 )
 
 const defaultHint = "[ Press Space to dismiss ]"
 
+const (
+	envColor  = "PLAQQ_COLOR"
+	envFont   = "PLAQQ_FONT"
+	envBold   = "PLAQQ_BOLD"
+	envHint   = "PLAQQ_HINT"
+	envNoHint = "PLAQQ_NO_HINT"
+)
+
 var (
-	version    string
-	jsonOutput bool
+	version            string
+	jsonOutput         bool
+	styleWarningOutput io.Writer = os.Stderr
 
 	// Styling flags for the notice display.
 	flagColor  string
@@ -101,6 +112,13 @@ var configStyleSource = styleValueSource{
 	invalidAction: invalidStyleValueError,
 }
 
+func envStyleSource(name string) styleValueSource {
+	return styleValueSource{
+		label:         name + " environment variable",
+		invalidAction: invalidStyleValueWarn,
+	}
+}
+
 func flagStyleSource(name string) styleValueSource {
 	return styleValueSource{
 		label:         "--" + name + " flag",
@@ -108,14 +126,28 @@ func flagStyleSource(name string) styleValueSource {
 	}
 }
 
+func sessionStyleSource(field string) styleValueSource {
+	return styleValueSource{
+		label:         "session state " + field,
+		invalidAction: invalidStyleValueWarn,
+	}
+}
+
 func (src styleValueSource) handleInvalid(err error) error {
 	switch src.invalidAction {
 	case invalidStyleValueWarn:
-		// Future env/session layers use this branch to warn and fall through.
+		warnStyleValue(err)
 		return nil
 	default:
 		return err
 	}
+}
+
+func warnStyleValue(err error) {
+	if styleWarningOutput == nil {
+		return
+	}
+	fmt.Fprintf(styleWarningOutput, "plaqq: warning: %v; ignoring value\n", err)
 }
 
 func styleValueError(source styleValueSource, format string, args ...any) error {
@@ -218,7 +250,7 @@ func minInt(a, b, c int) int {
 }
 
 // styleSettings is the effective notice styling after layering defaults, the
-// config file, and CLI flags.
+// config file, environment variables, session state, and CLI flags.
 type styleSettings struct {
 	color  string
 	font   string
@@ -228,8 +260,8 @@ type styleSettings struct {
 }
 
 // resolveStyle determines the effective notice styling by layering, in order:
-// built-in defaults, values from the config file, then any CLI flags the user
-// explicitly set (so a flag always wins over the config file).
+// built-in defaults, values from the config file, environment variables,
+// session state, then any CLI flags the user explicitly set.
 func resolveStyle(cmd *cobra.Command) (styleSettings, error) {
 	s := styleSettings{color: "", font: "", bold: true, hint: defaultHint, noHint: false}
 
@@ -261,6 +293,26 @@ func resolveStyle(cmd *cobra.Command) (styleSettings, error) {
 		s.noHint = *cfg.NoHint
 	}
 
+	if err := applyEnvLayer(&s); err != nil {
+		return styleSettings{}, err
+	}
+
+	state, err := session.Load(styleWarningOutput)
+	if err != nil {
+		warnStyleValue(styleValueError(sessionStyleSource("record"), "%v", err))
+	} else {
+		if state.Color != "" {
+			if err := applyColorLayer(&s, state.Color, sessionStyleSource("color")); err != nil {
+				return styleSettings{}, err
+			}
+		}
+		if state.Font != "" {
+			if err := applyFontLayer(&s, state.Font, sessionStyleSource("font")); err != nil {
+				return styleSettings{}, err
+			}
+		}
+	}
+
 	if cmd.Flags().Changed("color") {
 		if err := applyColorLayer(&s, flagColor, flagStyleSource("color")); err != nil {
 			return styleSettings{}, err
@@ -284,11 +336,52 @@ func resolveStyle(cmd *cobra.Command) (styleSettings, error) {
 	return s, nil
 }
 
+func applyEnvLayer(s *styleSettings) error {
+	if value, ok := os.LookupEnv(envColor); ok && value != "" {
+		if err := applyColorLayer(s, value, envStyleSource(envColor)); err != nil {
+			return err
+		}
+	}
+	if value, ok := os.LookupEnv(envFont); ok && value != "" {
+		if err := applyFontLayer(s, value, envStyleSource(envFont)); err != nil {
+			return err
+		}
+	}
+	if err := applyBoolEnvLayer(envBold, func(parsed bool) {
+		s.bold = parsed
+	}); err != nil {
+		return err
+	}
+	if value, ok := os.LookupEnv(envHint); ok && value != "" {
+		s.hint = value
+	}
+	if err := applyBoolEnvLayer(envNoHint, func(parsed bool) {
+		s.noHint = parsed
+	}); err != nil {
+		return err
+	}
+	return nil
+}
+
+func applyBoolEnvLayer(name string, set func(bool)) error {
+	if value, ok := os.LookupEnv(name); ok && value != "" {
+		parsed, err := strconv.ParseBool(strings.TrimSpace(value))
+		if err == nil {
+			set(parsed)
+			return nil
+		}
+		source := envStyleSource(name)
+		if err := source.handleInvalid(styleValueError(source, "invalid boolean %q", value)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func applyColorLayer(s *styleSettings, value string, source styleValueSource) error {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		s.color = ""
-		return nil
+		return source.handleInvalid(styleValueError(source, "color is empty"))
 	}
 	if _, err := parseColorFromSource(value, source); err != nil {
 		return source.handleInvalid(err)
@@ -300,8 +393,7 @@ func applyColorLayer(s *styleSettings, value string, source styleValueSource) er
 func applyFontLayer(s *styleSettings, value string, source styleValueSource) error {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		s.font = ""
-		return nil
+		return source.handleInvalid(styleValueError(source, "font is empty"))
 	}
 	if !font.Has(value) {
 		return source.handleInvalid(unknownStyleValueError("font", value, source, font.Names(), "fonts", ""))
@@ -332,7 +424,8 @@ block faces (block, heavy, compact).`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Resolve styling with precedence: built-in defaults < config file < CLI flags.
+		// Resolve styling with precedence: built-in defaults < config file <
+		// environment variables < session state < CLI flags.
 		style, err := resolveStyle(cmd)
 		if err != nil {
 			return err
