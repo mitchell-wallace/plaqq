@@ -126,11 +126,11 @@
       "title": "Docs for the refined fonts and palette",
       "description": "Context: refine-fonts-and-palette tasks 6.1-6.2. Outcome: README.md documents the three fonts, the semantic adaptive palette, the hex/ANSI escape hatch, and the hard-error-on-unknown-name behaviour; AGENTS.md describes the font architecture and the removal of go-figure/FIGlet; the breaking removals (FIGlet font names and the old presets) are noted in the changelog/release notes. Files \u0026 scope: README.md, AGENTS.md, changelog. Design: do NOT bump the VERSION file — a VERSION change triggers the auto-tag release workflow; the release is a separate deliberate step. Acceptance: docs match the implemented behaviour; VERSION is unchanged. Do not tick tasks.md.",
       "assignee": "JUNIOR",
-      "isDone": false,
+      "isDone": true,
       "order": 720896,
       "createdAt": "2026-06-19T06:35:14.47718648Z",
-      "updatedAt": "2026-06-19T06:35:14.47718648Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T09:31:03.151871741Z",
+      "completedAt": "2026-06-22T09:31:03.151871741Z"
     },
     {
       "id": "plaq-2699",
