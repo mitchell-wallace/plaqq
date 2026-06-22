@@ -148,11 +148,11 @@
       "title": "Add the per-terminal session-state store",
       "description": "Context: first style-config-ergonomics lap (openspec/changes/style-config-ergonomics/ — read design.md '## session-state file' and tasks 2.1, 2.3). Assumes refine-fonts-and-palette has landed (three fonts, five presets). Outcome: a small store (e.g. internal/session) that persists at least font and colour for the current terminal session, keyed by os.Getppid(), under $XDG_RUNTIME_DIR/plaqq/ with an os.TempDir() fallback; Load/Save/Clear; written atomically (temp file + rename, mode 0600); a malformed or invalid record is ignored with a warning and never blocks. Files \u0026 scope: new internal/session package plus unit tests; no resolveStyle wiring yet (next lap). Design: PPID is the zero-dep 'this shell' key — document the PID-reuse caveat in a comment; atomic write matters (this repo has prior ETXTBSY/atomic-install lessons); mode 0600. Acceptance: Save then Load round-trips; Clear removes; distinct keys isolate; a malformed file yields warn + empty with no error. Do not tick tasks.md.",
       "assignee": "SENIOR",
-      "isDone": false,
+      "isDone": true,
       "order": 851968,
       "createdAt": "2026-06-19T06:35:14.477188082Z",
-      "updatedAt": "2026-06-19T06:35:14.477188082Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T09:45:42.186385607Z",
+      "completedAt": "2026-06-22T09:45:42.186385607Z"
     },
     {
       "id": "plaq-6526",
