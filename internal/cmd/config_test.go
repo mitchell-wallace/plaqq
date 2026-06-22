@@ -1,10 +1,17 @@
 package cmd
 
 import (
+	"bytes"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mitchell-wallace/plaqq/internal/config"
 	"github.com/mitchell-wallace/plaqq/internal/font"
+	"github.com/mitchell-wallace/plaqq/internal/session"
+	"github.com/spf13/pflag"
 )
 
 func TestSeedFormStateTolerance(t *testing.T) {
@@ -113,5 +120,160 @@ func TestBuildSavedConfig(t *testing.T) {
 	}
 	if cfg3.Hint == nil || *cfg3.Hint != "custom hint" {
 		t.Errorf("expected custom hint to be saved, got %v", cfg3.Hint)
+	}
+}
+
+func resetConfigFlags() {
+	flagSession = false
+	flagConfigClear = false
+	flagConfigColor = ""
+	flagConfigFont = ""
+	jsonOutput = false
+	rootCmd.SetArgs(nil)
+	rootCmd.Flags().VisitAll(func(f *pflag.Flag) {
+		_ = f.Value.Set(f.DefValue)
+		f.Changed = false
+	})
+	configCmd.Flags().VisitAll(func(f *pflag.Flag) {
+		_ = f.Value.Set(f.DefValue)
+		f.Changed = false
+	})
+}
+
+func TestConfigSessionSet(t *testing.T) {
+	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "config.toml"))
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	resetConfigFlags()
+
+	rootCmd.SetArgs([]string{"config", "--session", "--color", "alert", "--font", "heavy"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("config --session: %v", err)
+	}
+
+	state, err := session.Load(nil)
+	if err != nil {
+		t.Fatalf("session Load: %v", err)
+	}
+	if state.Color != "alert" {
+		t.Errorf("expected session color 'alert', got %q", state.Color)
+	}
+	if state.Font != "heavy" {
+		t.Errorf("expected session font 'heavy', got %q", state.Font)
+	}
+}
+
+func TestConfigSessionClear(t *testing.T) {
+	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "config.toml"))
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	resetConfigFlags()
+
+	// First, save some session state
+	if err := session.Save(session.State{Color: "focus", Font: "compact"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+
+	// Make sure it exists
+	state, err := session.Load(nil)
+	if err != nil || state.Empty() {
+		t.Fatalf("expected non-empty session before clear")
+	}
+
+	// Now clear it
+	rootCmd.SetArgs([]string{"config", "--session", "--clear"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("config --session --clear: %v", err)
+	}
+
+	// Verify it was cleared
+	state, err = session.Load(nil)
+	if err != nil {
+		t.Fatalf("session Load: %v", err)
+	}
+	if !state.Empty() {
+		t.Errorf("expected empty session state after clear, got %+v", state)
+	}
+}
+
+func TestConfigValidationErrors(t *testing.T) {
+	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "config.toml"))
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{
+			name:    "clear without session",
+			args:    []string{"--clear"},
+			wantErr: "flag --clear requires --session",
+		},
+		{
+			name:    "color without session",
+			args:    []string{"--color", "alert"},
+			wantErr: "flags --color and --font require --session",
+		},
+		{
+			name:    "font without session",
+			args:    []string{"--font", "heavy"},
+			wantErr: "flags --color and --font require --session",
+		},
+		{
+			name:    "invalid session color",
+			args:    []string{"--session", "--color", "invalid_color"},
+			wantErr: "unknown color",
+		},
+		{
+			name:    "invalid session font",
+			args:    []string{"--session", "--font", "invalid_font"},
+			wantErr: "unknown font",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetConfigFlags()
+			rootCmd.SetArgs(append([]string{"config"}, tt.args...))
+			err := rootCmd.Execute()
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("expected error containing %q, got %q", tt.wantErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestConfigSessionJSON(t *testing.T) {
+	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "config.toml"))
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	resetConfigFlags()
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Set session state directly
+	if err := session.Save(session.State{Color: "alert", Font: "heavy"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"config", "--session", "--json-output"})
+	err := rootCmd.Execute()
+	w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("config --session --json-output: %v", err)
+	}
+
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	out := buf.String()
+
+	if !strings.Contains(out, `"color":"alert"`) || !strings.Contains(out, `"font":"heavy"`) {
+		t.Errorf("expected output to contain json representations of color and font, got %q", out)
 	}
 }

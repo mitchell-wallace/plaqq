@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/mitchell-wallace/plaqq/internal/config"
 	"github.com/mitchell-wallace/plaqq/internal/font"
+	"github.com/mitchell-wallace/plaqq/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -16,6 +17,13 @@ import (
 const (
 	colorDefaultChoice = "default — info"
 	colorCustomChoice  = "custom hex / ANSI…"
+)
+
+var (
+	flagSession     bool
+	flagConfigClear bool
+	flagConfigColor string
+	flagConfigFont  string
 )
 
 var configCmd = &cobra.Command{
@@ -28,6 +36,15 @@ Run 'plaqq config' with no subcommand to edit those defaults in an interactive
 picker. Use the subcommands to inspect or scaffold the file directly.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if !flagSession {
+			if flagConfigClear {
+				return errors.New("flag --clear requires --session")
+			}
+			if cmd.Flags().Changed("color") || cmd.Flags().Changed("font") {
+				return errors.New("flags --color and --font require --session")
+			}
+		}
+
 		path, err := config.Path()
 		if err != nil {
 			return err
@@ -35,6 +52,93 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 		cfg, err := config.Load(path)
 		if err != nil {
 			return err
+		}
+
+		if flagSession {
+			if flagConfigClear {
+				if err := session.Clear(); err != nil {
+					return err
+				}
+				if jsonOutput {
+					printJSON(map[string]any{"path": session.Current().Path(), "cleared": true})
+					return nil
+				}
+				fmt.Printf("Cleared session state from %s\n", session.Current().Path())
+				return nil
+			}
+
+			// If flags are set, save directly without picker
+			if cmd.Flags().Changed("color") || cmd.Flags().Changed("font") {
+				var sessState session.State
+				if cmd.Flags().Changed("color") {
+					colorVal := strings.TrimSpace(flagConfigColor)
+					if colorVal != "" {
+						if _, err := parseColor(colorVal); err != nil {
+							return err
+						}
+					}
+					sessState.Color = colorVal
+				}
+				if cmd.Flags().Changed("font") {
+					fontVal := strings.TrimSpace(flagConfigFont)
+					if fontVal != "" {
+						if !font.Has(fontVal) {
+							return fmt.Errorf("unknown font %q: valid fonts are %s", fontVal, strings.Join(font.Names(), ", "))
+						}
+					}
+					sessState.Font = fontVal
+				}
+
+				if err := session.Save(sessState); err != nil {
+					return err
+				}
+
+				if jsonOutput {
+					printJSON(map[string]any{
+						"path":  session.Current().Path(),
+						"color": sessState.Color,
+						"font":  sessState.Font,
+					})
+					return nil
+				}
+
+				fmt.Printf("Saved session styling to %s\n\n", session.Current().Path())
+				str := func(s string, dflt string) string {
+					if s != "" {
+						return s
+					}
+					return dflt + "  (default)"
+				}
+				var b strings.Builder
+				fmt.Fprintf(&b, "  color    %s\n", str(sessState.Color, "info"))
+				fmt.Fprintf(&b, "  font     %s\n", str(sessState.Font, font.DefaultName))
+				fmt.Print(b.String())
+				return nil
+			}
+
+			if jsonOutput {
+				sessState, _ := session.Load(nil)
+				m := map[string]any{"path": session.Current().Path()}
+				if sessState.Color != "" {
+					m["color"] = sessState.Color
+				}
+				if sessState.Font != "" {
+					m["font"] = sessState.Font
+				}
+				printJSON(m)
+				return nil
+			}
+
+			// Otherwise, run the picker seeded with current session state (or fallback config)
+			sessState, err := session.Load(styleWarningOutput)
+			if err == nil {
+				if sessState.Color != "" {
+					cfg.Color = &sessState.Color
+				}
+				if sessState.Font != "" {
+					cfg.Font = &sessState.Font
+				}
+			}
 		}
 
 		if jsonOutput {
@@ -177,13 +281,15 @@ func runConfigPicker(path string, cfg *config.Config) error {
 				Title("Color").
 				Options(colorOptions()...).
 				Value(&colorChoice),
+		),
+		huh.NewGroup(
 			huh.NewConfirm().
 				Title("Bold text?").
 				Value(&bold),
 			huh.NewConfirm().
 				Title("Show the dismiss hint?").
 				Value(&showHint),
-		),
+		).WithHideFunc(func() bool { return flagSession }),
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Custom color").
@@ -195,7 +301,7 @@ func runConfigPicker(path string, cfg *config.Config) error {
 			huh.NewInput().
 				Title("Hint text").
 				Value(&hintText),
-		).WithHideFunc(func() bool { return !showHint }),
+		).WithHideFunc(func() bool { return !showHint || flagSession }),
 	)
 
 	if err := form.Run(); err != nil {
@@ -207,6 +313,34 @@ func runConfigPicker(path string, cfg *config.Config) error {
 	}
 
 	out := buildSavedConfig(fontChoice, colorChoice, customColor, bold, showHint, hintText)
+
+	if flagSession {
+		state := session.State{
+			Color: "",
+			Font:  "",
+		}
+		if out.Color != nil {
+			state.Color = *out.Color
+		}
+		if out.Font != nil {
+			state.Font = *out.Font
+		}
+		if err := session.Save(state); err != nil {
+			return err
+		}
+		fmt.Printf("Saved session styling to %s\n\n", session.Current().Path())
+		str := func(s string, dflt string) string {
+			if s != "" {
+				return s
+			}
+			return dflt + "  (default)"
+		}
+		var b strings.Builder
+		fmt.Fprintf(&b, "  color    %s\n", str(state.Color, "info"))
+		fmt.Fprintf(&b, "  font     %s\n", str(state.Font, font.DefaultName))
+		fmt.Print(b.String())
+		return nil
+	}
 
 	if err := config.Save(path, out); err != nil {
 		return err
@@ -293,6 +427,11 @@ func configJSON(path string, cfg *config.Config) map[string]any {
 }
 
 func init() {
+	configCmd.Flags().BoolVar(&flagSession, "session", false, "edit or clear session-state instead of persistent config")
+	configCmd.Flags().BoolVar(&flagConfigClear, "clear", false, "remove the session-state record (requires --session)")
+	configCmd.Flags().StringVar(&flagConfigColor, "color", "", "session color: a preset name, a hex code, or an ANSI index")
+	configCmd.Flags().StringVar(&flagConfigFont, "font", "", "session font: one of the registered fonts")
+
 	configCmd.AddCommand(configPathCmd, configInitCmd)
 	rootCmd.AddCommand(configCmd)
 }
