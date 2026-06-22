@@ -137,11 +137,11 @@
       "title": "Final verification: refine-fonts-and-palette",
       "description": "Full-change verification that closes refine-fonts-and-palette before the style-config laps begin. Use the openspec-verify-change skill across the entire change and inspect the whole batch diff. First identify the intended merge target from the user/PR/repo history (do NOT assume main) and the batch's first lap (the font-gallery lap), treating earlier branch work as pre-existing; never rewrite git history. Run a gofmt check, `go vet ./...`, `go build ./...`, and `go test ./...`; run cmd/fontgallery and confirm all three fonts read well; run `openspec validate refine-fonts-and-palette --strict`. Check off every remaining tasks.md box you verify as correctly and thoroughly done; for any gap, add a focused head lap. Confirm the working tree now matches the post-refine end-state that the style-config-ergonomics laps assume (three fonts, five presets, go-figure gone).",
       "assignee": "VERIFY",
-      "isDone": false,
+      "isDone": true,
       "order": 786432,
       "createdAt": "2026-06-19T06:35:14.477187288Z",
-      "updatedAt": "2026-06-19T06:35:14.477187288Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T09:38:02.611268651Z",
+      "completedAt": "2026-06-22T09:38:02.611268651Z"
     },
     {
       "id": "plaq-f885",
