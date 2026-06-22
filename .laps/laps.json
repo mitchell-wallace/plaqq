@@ -203,11 +203,11 @@
       "title": "Verify interactive flow and session helper",
       "description": "The interactive-flow lap touches a data path (session persistence) and the primary UX, so verify thoroughly. Use the openspec-verify-change skill against style-config-ergonomics, focused on the interactive-prompt spec: Confirm is the default fast path; Customise picks font+colour and sticks for the session while a separate pane is unaffected; back-navigation edits the message; the message-argument path is immediate; the non-interactive/json guard exits cleanly; aborting exits cleanly; plus `--session`/`--clear` from the prior lap. Identify the merge target (not assumed main) and the batch's first lap before diffing; do not rewrite history. Check off the §3 and §4 tasks.md boxes verified done; add a head lap for any gap.",
       "assignee": "VERIFY",
-      "isDone": false,
+      "isDone": true,
       "order": 1179648,
       "createdAt": "2026-06-19T06:35:14.477198041Z",
-      "updatedAt": "2026-06-19T06:35:14.477198041Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T10:49:50.666519032Z",
+      "completedAt": "2026-06-22T10:49:50.666519032Z"
     },
     {
       "id": "plaq-ea81",
