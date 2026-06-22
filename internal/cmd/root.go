@@ -150,12 +150,11 @@ defaults via 'plaqq config' (an interactive picker). Flags override the config.
 
 Colors accept a preset name (teal, coral, amber, lime, azure, violet, magenta,
 rose, crimson, slate), a hex code, or an ANSI index. Fonts include Unicode
-block faces (block, heavy, compact) and FIGlet ASCII faces (standard, slant,
-banner, big, small, doom, larry3d, mini, cyberlarge).`,
+block faces (block, heavy, compact).`,
 	Example: `  plaqq "deploy starting"
   plaqq --color coral "build failed"
   plaqq --font heavy --color "#ff5f87" "build failed"
-  plaqq --font slant --bold=false "heads up"
+  plaqq --font compact --bold=false "heads up"
   plaqq --hint "press space to continue" "meeting in 5"
   plaqq --no-hint "stand clear"`,
 	Args:          cobra.MaximumNArgs(1),

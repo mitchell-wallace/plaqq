@@ -8,7 +8,7 @@ It takes any custom notice text, renders it in a centered, chunky ASCII block fo
 
 ## Features
 
-- **Multiple Fonts**: Ships Unicode block faces (`block`, `heavy`, `compact`) plus a curated set of FIGlet ASCII faces (`standard`, `slant`, `banner`, `big`, `small`, `doom`, `larry3d`, `mini`, `cyberlarge`).
+- **Multiple Fonts**: Ships Unicode block faces (`block`, `heavy`, `compact`).
 - **Color Presets**: Pick a named color (`teal`, `coral`, `amber`, `lime`, `azure`, `violet`, `magenta`, `rose`, `crimson`, `slate`) or supply your own hex / ANSI value.
 - **Interactive Config Picker**: Run `plaqq config` (no subcommand) to edit your styling defaults in a friendly form.
 - **Dynamic Centering & Word Wrapping**: Automatically wraps text to fit within your terminal pane margin and keeps the notice perfectly centered vertically and horizontally.
@@ -51,10 +51,10 @@ plaqq "remember to run e2e tests before pushing"
 
 The notice appearance can be customized with flags (run `plaqq -h` to see them all):
 
-*   **`--font`**: Font used to render the notice. Block faces: `block` (default), `heavy`, `compact`. FIGlet ASCII faces: `standard`, `slant`, `banner`, `big`, `small`, `doom`, `larry3d`, `mini`, `cyberlarge`.
+*   **`--font`**: Font used to render the notice. Block faces: `block` (default), `heavy`, `compact`.
     ```bash
     plaqq --font heavy "shipped"
-    plaqq --font slant "heads up"
+    plaqq --font compact "heads up"
     ```
 *   **`--color`**: Notice text color as a preset name (`teal`, `coral`, `amber`, `lime`, `azure`, `violet`, `magenta`, `rose`, `crimson`, `slate`), a hex code (`#00f5d4`), or an ANSI index (`0`-`255`). Defaults to an adaptive teal that suits both light and dark terminals.
     ```bash

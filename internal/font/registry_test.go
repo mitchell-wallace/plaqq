@@ -7,7 +7,7 @@ func TestNamesIncludeExpected(t *testing.T) {
 	if len(got) == 0 || got[0] != DefaultName {
 		t.Fatalf("Names()[0] = %v; want %q first", got, DefaultName)
 	}
-	want := []string{"block", "compact", "heavy", "standard", "slant", "cyberlarge"}
+	want := []string{"block", "compact", "heavy"}
 	for _, w := range want {
 		if !Has(w) {
 			t.Errorf("expected font %q to be registered; Names()=%v", w, got)
@@ -25,7 +25,7 @@ func TestGetFallsBackToDefault(t *testing.T) {
 }
 
 // TestEveryFontRenders guards against a registered font that panics or yields
-// nothing, including the go-figure-backed ones.
+// nothing.
 func TestEveryFontRenders(t *testing.T) {
 	for _, name := range Names() {
 		f := Get(name)

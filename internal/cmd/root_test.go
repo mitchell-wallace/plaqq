@@ -56,7 +56,7 @@ func TestResolveStyleConfigThenFlagOverride(t *testing.T) {
 
 	// Flags override the config file for the flags that were set.
 	cmd = newStyleFlagCmd()
-	for flag, val := range map[string]string{"color": "#123456", "font": "slant", "bold": "true"} {
+	for flag, val := range map[string]string{"color": "#123456", "font": "compact", "bold": "true"} {
 		if err := cmd.Flags().Set(flag, val); err != nil {
 			t.Fatal(err)
 		}
@@ -65,8 +65,8 @@ func TestResolveStyleConfigThenFlagOverride(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.color != "#123456" || s.font != "slant" || s.bold != true {
-		t.Errorf("flag override = %+v; want color=#123456 font=slant bold=true", s)
+	if s.color != "#123456" || s.font != "compact" || s.bold != true {
+		t.Errorf("flag override = %+v; want color=#123456 font=compact bold=true", s)
 	}
 	// Unset flags still fall back to the config file.
 	if s.hint != "cfg hint" || s.noHint != true {

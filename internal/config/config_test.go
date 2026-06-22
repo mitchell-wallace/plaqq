@@ -65,7 +65,7 @@ func TestSaveRoundTrips(t *testing.T) {
 
 func TestSaveOmitsUnsetFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
-	font := "slant"
+	font := "compact"
 	if err := Save(path, &Config{Font: &font}); err != nil {
 		t.Fatalf("Save: %v", err)
 	}

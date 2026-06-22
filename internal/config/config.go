@@ -33,8 +33,7 @@ const Template = `# plaqq configuration
 # color = "teal"
 
 # Font used to render the notice. Block fonts: "block" (default), "heavy",
-# "compact". FIGlet fonts: "standard", "slant", "banner", "big", "small",
-# "doom", "larry3d", "mini", "cyberlarge".
+# "compact".
 # font = "block"
 
 # Render the notice text in bold.
