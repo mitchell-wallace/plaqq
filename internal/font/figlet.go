@@ -60,9 +60,9 @@ func trimBlankEdges(rows []string) []string {
 }
 
 // mappedFiglet renders an underlying FIGlet font and rewrites individual glyph
-// characters one-for-one. It powers "block" fonts derived from a clean ASCII
-// face: banner3 has crisp, legible letterforms drawn entirely from '#', so
-// swapping '#' for a Unicode full block yields a solid block font for free.
+// characters one-for-one. It is retained for the FIGlet faces; the "heavy"
+// font is now a hand-authored solid block map (see heavy.go) and is no longer
+// derived from banner3.
 type mappedFiglet struct {
 	base figletFont
 	repl *strings.Replacer
@@ -84,10 +84,4 @@ func init() {
 	for _, name := range figletFonts {
 		register(name, figletFont{name: name})
 	}
-	// "heavy" is banner3's solid letterforms rendered in Unicode blocks — a
-	// bold companion to the lighter built-in block font.
-	register("heavy", mappedFiglet{
-		base: figletFont{name: "banner3"},
-		repl: strings.NewReplacer("#", "█"),
-	})
 }
