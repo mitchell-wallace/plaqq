@@ -2,13 +2,17 @@ package cmd
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/huh"
+	"github.com/mitchell-wallace/plaqq/internal/font"
 	"github.com/mitchell-wallace/plaqq/internal/session"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // newStyleFlagCmd builds a command whose styling flags are bound to the same
@@ -325,5 +329,211 @@ func requireErrorContains(t *testing.T, err error, substrs ...string) {
 		if !strings.Contains(msg, substr) {
 			t.Fatalf("error %q does not contain %q", msg, substr)
 		}
+	}
+}
+
+func optionValues[T comparable](opts []huh.Option[T]) []T {
+	out := make([]T, len(opts))
+	for i, o := range opts {
+		out[i] = o.Value
+	}
+	return out
+}
+
+func contains[T comparable](slice []T, v T) bool {
+	for _, x := range slice {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+func TestInteractiveFormAllowed(t *testing.T) {
+	cases := []struct {
+		name    string
+		isTTY   bool
+		jsonOut bool
+		allowed bool
+	}{
+		{"tty plain", true, false, true},
+		{"tty json", true, true, false},
+		{"notty plain", false, false, false},
+		{"notty json", false, true, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := interactiveFormAllowed(c.isTTY, c.jsonOut); got != c.allowed {
+				t.Errorf("interactiveFormAllowed(%v,%v) = %v; want %v", c.isTTY, c.jsonOut, got, c.allowed)
+			}
+		})
+	}
+}
+
+func TestSeedCustomiseFont(t *testing.T) {
+	cases := []struct {
+		resolved string
+		want     string
+	}{
+		{"heavy", "heavy"},
+		{"compact", "compact"},
+		{"", font.DefaultName},
+		{"   ", font.DefaultName},
+		{"slant", font.DefaultName}, // unknown font falls back to default
+		{"  HEAVY  ", "heavy"},      // trimmed and case-insensitive
+	}
+	for _, c := range cases {
+		if got := seedCustomiseFont(c.resolved); got != c.want {
+			t.Errorf("seedCustomiseFont(%q) = %q; want %q", c.resolved, got, c.want)
+		}
+	}
+}
+
+func TestCustomiseColorOptions(t *testing.T) {
+	// Empty resolved -> seeds to info, presets only, no extra option.
+	opts, choice := customiseColorOptions("")
+	if choice != "info" {
+		t.Errorf("empty choice = %q; want info", choice)
+	}
+	if vals := optionValues(opts); !contains(vals, "info") || len(vals) != len(presetOrder) {
+		t.Errorf("empty options = %v; want exactly the presets", vals)
+	}
+
+	// Preset resolved -> seeds to that preset, no extra option.
+	opts, choice = customiseColorOptions("alert")
+	if choice != "alert" {
+		t.Errorf("preset choice = %q; want alert", choice)
+	}
+	if vals := optionValues(opts); contains(vals, "alert") == false || len(vals) != len(presetOrder) {
+		t.Errorf("preset options = %v; want presets only", vals)
+	}
+
+	// Case-insensitive preset.
+	_, choice = customiseColorOptions("FOCUS")
+	if choice != "focus" {
+		t.Errorf("uppercase preset choice = %q; want focus", choice)
+	}
+
+	// Custom hex resolved -> seeds to the value, value offered as a leading option.
+	opts, choice = customiseColorOptions("#ff5f87")
+	if choice != "#ff5f87" {
+		t.Errorf("custom choice = %q; want #ff5f87", choice)
+	}
+	vals := optionValues(opts)
+	if !contains(vals, "#ff5f87") {
+		t.Errorf("custom options %v missing the resolved value", vals)
+	}
+	if len(vals) != len(presetOrder)+1 {
+		t.Errorf("custom options = %v; want presets plus the custom value", vals)
+	}
+	if opts[0].Value != "#ff5f87" {
+		t.Errorf("custom value should lead the options; first = %q", opts[0].Value)
+	}
+
+	// Invalid resolved -> seeds to info, no extra option.
+	opts, choice = customiseColorOptions("not-a-color")
+	if choice != "info" {
+		t.Errorf("invalid choice = %q; want info", choice)
+	}
+	if vals := optionValues(opts); len(vals) != len(presetOrder) {
+		t.Errorf("invalid options = %v; want presets only", vals)
+	}
+}
+
+// TestCustomiseSessionRoundTrip simulates the customise step writing font+colour
+// to the session store, then a later plaqq resolving style (no flags) picks them
+// up — the "customise sticks for the session" persistence plumbing.
+func TestCustomiseSessionRoundTrip(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	if err := session.Save(session.State{Font: "heavy", Color: "alert"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+	cmd := newStyleFlagCmd()
+	s, err := resolveStyle(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.font != "heavy" || s.color != "alert" {
+		t.Errorf("after customise save, style = {font:%q color:%q}; want heavy/alert", s.font, s.color)
+	}
+}
+
+func TestCustomiseSessionRoundTripCustomColor(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	if err := session.Save(session.State{Font: "compact", Color: "#ff5f87"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+	cmd := newStyleFlagCmd()
+	s, err := resolveStyle(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.font != "compact" || s.color != "#ff5f87" {
+		t.Errorf("after customise save, style = {font:%q color:%q}; want compact/#ff5f87", s.font, s.color)
+	}
+}
+
+// runBareExit invokes the bare (no-message) root path and recovers the exit()
+// panic, returning the captured stderr, the exit code, and whether the guard
+// fired. It is the harness for the non-interactive guard tests.
+func runBareExit(t *testing.T, setJSON bool) (stderr string, code int, exited bool) {
+	t.Helper()
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	if setJSON {
+		jsonOutput = true
+		t.Cleanup(func() { jsonOutput = false })
+	}
+
+	r, w, _ := os.Pipe()
+	oldStderr := os.Stderr
+	os.Stderr = w
+	cmd := newStyleFlagCmd()
+
+	var recovered any
+	func() {
+		defer func() { recovered = recover() }()
+		_ = rootCmd.RunE(cmd, nil)
+	}()
+	w.Close()
+	os.Stderr = oldStderr
+
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	if ee, ok := recovered.(*exitError); ok {
+		code = ee.code
+		exited = true
+	}
+	return buf.String(), code, exited
+}
+
+func TestBareInvocationNonTTYExitsForMessage(t *testing.T) {
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		t.Skip("cannot exercise the non-TTY guard when test stdin is a terminal")
+	}
+	stderr, code, exited := runBareExit(t, false)
+	if !exited {
+		t.Fatal("expected exit() panic for bare non-TTY invocation")
+	}
+	if code != 1 {
+		t.Errorf("exit code = %d; want 1", code)
+	}
+	if !strings.Contains(stderr, "a message is required") {
+		t.Errorf("stderr = %q; want it to contain 'a message is required'", stderr)
+	}
+}
+
+func TestBareInvocationJSONOutputExitsForMessage(t *testing.T) {
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		t.Skip("cannot exercise the non-TTY guard when test stdin is a terminal")
+	}
+	stderr, code, exited := runBareExit(t, true)
+	if !exited {
+		t.Fatal("expected exit() panic for bare --json-output invocation")
+	}
+	if code != 1 {
+		t.Errorf("exit code = %d; want 1", code)
+	}
+	if !strings.Contains(stderr, `"error":"a message is required"`) {
+		t.Errorf("stderr = %q; want JSON error containing 'a message is required'", stderr)
 	}
 }

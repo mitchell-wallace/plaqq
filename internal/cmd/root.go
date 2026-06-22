@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -17,6 +19,7 @@ import (
 	"github.com/mitchell-wallace/plaqq/internal/font"
 	"github.com/mitchell-wallace/plaqq/internal/session"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 const defaultHint = "[ Press Space to dismiss ]"
@@ -402,6 +405,133 @@ func applyFontLayer(s *styleSettings, value string, source styleValueSource) err
 	return nil
 }
 
+// Sentinel values for the confirm/customise action select. The select stores one
+// of these in the bound value as the user navigates.
+const (
+	actionConfirm   = "Confirm"
+	actionCustomise = "Customise"
+)
+
+// interactiveFormAllowed reports whether the bare-invocation confirm/customise
+// form can run: it needs an interactive stdin TTY and must not be in
+// --json-output mode (the form, like the old huh.NewInput prompt, cannot render
+// without a TTY).
+func interactiveFormAllowed(isTTY bool, jsonOut bool) bool {
+	return isTTY && !jsonOut
+}
+
+// seedCustomiseFont returns the font select choice seeded from the resolved
+// style, defaulting to the block font when the style carries no valid font. The
+// result is lower-cased so it matches the canonical font option values.
+func seedCustomiseFont(resolved string) string {
+	if v := strings.ToLower(strings.TrimSpace(resolved)); v != "" && font.Has(v) {
+		return v
+	}
+	return font.DefaultName
+}
+
+// customiseColorOptions builds the colour options for the customise select,
+// seeded from the resolved style colour. The semantic presets are always
+// offered; a resolved custom (hex/ANSI) colour is included as a leading option
+// so the current value stays represented and selectable. It returns the options
+// and the seeded choice (which always matches one of the option values).
+func customiseColorOptions(resolved string) ([]huh.Option[string], string) {
+	resolved = strings.TrimSpace(resolved)
+	choice := "info"
+	if resolved != "" {
+		if _, ok := presetColor(resolved); ok {
+			choice = strings.ToLower(resolved)
+		} else if _, err := parseColor(resolved); err == nil {
+			choice = resolved
+		}
+	}
+
+	opts := make([]huh.Option[string], 0, len(presetOrder)+1)
+	if resolved != "" {
+		if _, ok := presetColor(resolved); !ok {
+			if _, err := parseColor(resolved); err == nil {
+				opts = append(opts, huh.NewOption(resolved, resolved))
+			}
+		}
+	}
+	for _, name := range presetOrder {
+		opts = append(opts, huh.NewOption(name, name))
+	}
+	return opts, choice
+}
+
+// interactiveFormResult holds the outcome of the confirm/customise form.
+type interactiveFormResult struct {
+	message     string
+	fontChoice  string
+	colorChoice string
+	customised  bool
+}
+
+// runInteractiveForm presents the confirm/customise form for a bare invocation
+// (no message argument) and returns the chosen message and style.
+//
+// Group 1 holds the message input plus a Confirm/Customise select (Confirm
+// pre-selected, so the fast path is enter, enter). Group 2 holds the font and
+// colour selects and is shown via WithHideFunc only when Customise is chosen, so
+// the user can shift+tab back to edit the message. Esc and Ctrl-C abort at any
+// step (returned as huh.ErrUserAborted). Each select is seeded from the
+// fully-resolved style.
+func runInteractiveForm(style styleSettings) (interactiveFormResult, error) {
+	var message string
+	action := actionConfirm
+	fontChoice := seedCustomiseFont(style.font)
+	colorOpts, colorChoice := customiseColorOptions(style.color)
+
+	// Bind both Esc and Ctrl-C to quit so the abort affordance is consistent at
+	// every step (huh only binds Ctrl-C by default).
+	keymap := huh.NewDefaultKeyMap()
+	keymap.Quit = key.NewBinding(key.WithKeys("ctrl+c", "esc"), key.WithHelp("esc/ctrl+c", "quit"))
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Notice message").
+				Placeholder("e.g. remember to run e2e tests before pushing").
+				Value(&message).
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("a message is required")
+					}
+					return nil
+				}),
+			huh.NewSelect[string]().
+				Title("Confirm or customise").
+				Options(
+					huh.NewOption("Confirm — show it now", actionConfirm),
+					huh.NewOption("Customise — pick font & color", actionCustomise),
+				).
+				Value(&action),
+		),
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Font").
+				Options(fontOptions()...).
+				Value(&fontChoice),
+			huh.NewSelect[string]().
+				Title("Color").
+				Options(colorOpts...).
+				Value(&colorChoice),
+		).WithHideFunc(func() bool { return action != actionCustomise }),
+	).WithKeyMap(keymap)
+
+	if err := form.Run(); err != nil {
+		return interactiveFormResult{}, err
+	}
+
+	return interactiveFormResult{
+		message:     strings.TrimSpace(message),
+		fontChoice:  fontChoice,
+		colorChoice: colorChoice,
+		customised:  action == actionCustomise,
+	}, nil
+}
+
 var rootCmd = &cobra.Command{
 	Use:   "plaqq [message]",
 	Short: "plaqq displays a notice across the terminal pane in chunky letters",
@@ -431,34 +561,53 @@ block faces (block, heavy, compact).`,
 			return err
 		}
 
-		glyphFont := font.Get(style.font)
+		// Render font/colour start from the resolved style and may be overridden
+		// by the customise step below.
+		renderFont := style.font
+		renderColor := style.color
+
+		var noticeMsg string
+		if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
+			// Message-argument path: render immediately, no confirm/customise step.
+			noticeMsg = args[0]
+		} else {
+			// The confirm/customise form needs an interactive TTY. When stdin is
+			// piped/CI or --json-output is set, refuse to launch it and ask for a
+			// message argument instead. This also fixes a latent huh.NewInput hang
+			// under --json-output.
+			if !interactiveFormAllowed(term.IsTerminal(int(os.Stdin.Fd())), jsonOutput) {
+				exit(1, "a message is required")
+			}
+			res, err := runInteractiveForm(style)
+			if err != nil {
+				if errors.Is(err, huh.ErrUserAborted) {
+					// Esc/Ctrl-C at any step: clean exit, no notice.
+					return nil
+				}
+				return err
+			}
+			noticeMsg = res.message
+			if res.customised {
+				renderFont = res.fontChoice
+				renderColor = res.colorChoice
+				// Customise sticks for the session: write the chosen font and
+				// colour so the next plaqq in this pane reuses them. A write
+				// failure is non-fatal — warn and still render this notice.
+				if err := session.Save(session.State{Font: res.fontChoice, Color: res.colorChoice}); err != nil {
+					warnStyleValue(fmt.Errorf("could not save session state: %w", err))
+				}
+			}
+		}
+
+		glyphFont := font.Get(renderFont)
 
 		var noticeColor lipgloss.TerminalColor = lipgloss.AdaptiveColor{Light: "#00d7af", Dark: "#00f5d4"}
-		if style.color != "" {
-			c, err := parseColor(style.color)
+		if renderColor != "" {
+			c, err := parseColor(renderColor)
 			if err != nil {
 				return err
 			}
 			noticeColor = c
-		}
-
-		var noticeMsg string
-		if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
-			noticeMsg = args[0]
-		} else {
-			err := huh.NewInput().
-				Title("Enter notice message").
-				Placeholder("e.g. remember to run e2e tests before pushing").
-				Value(&noticeMsg).
-				Run()
-			if err != nil {
-				// Exit cleanly on abort
-				return nil
-			}
-			noticeMsg = strings.TrimSpace(noticeMsg)
-			if noticeMsg == "" {
-				return fmt.Errorf("a message is required")
-			}
 		}
 
 		// Start update check in background

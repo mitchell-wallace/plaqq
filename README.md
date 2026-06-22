@@ -85,7 +85,7 @@ plaqq: unknown font "heavyy" from --font flag: valid fonts are block, heavy, com
 
 ### Persistent Configuration
 
-Rather than passing flags every time, you can set styling defaults in a TOML config file. The resolution order is **built-in defaults → config file → CLI flags**, so a flag always wins over the config file.
+Rather than passing flags every time, you can set styling defaults in a TOML config file.
 
 The easiest way to manage it is the interactive picker — run `plaqq config` with no subcommand to navigate the font, color, bold, and hint options in a form and save your choices:
 
@@ -106,6 +106,80 @@ bold = true
 hint = "press space"
 no_hint = false
 ```
+
+### Style Precedence & Resolution
+
+When determining the visual style (color, font, bold, hint, etc.) for a notice, `plaqq` resolves style properties by layering sources from lowest to highest priority:
+
+1. **Built-in Defaults** (e.g. `info` color, `block` font)
+2. **Config File** (located at the path printed by `plaqq config path`)
+3. **Session Environment Variables** (prefixed with `PLAQQ_*`, scoped to the current shell)
+4. **Session State** (per-pane styling set by customise/`--session` flags)
+5. **CLI Flags** (e.g., `--color`, `--font`, scoped to a single command execution)
+
+A command-line flag always overrides all other sources for that specific run.
+
+### Environment Variables (`PLAQQ_*`)
+
+You can set ambient styles for your current shell pane using environment variables:
+
+| Environment Variable | Style Property | Expected Format |
+|---|---|---|
+| `PLAQQ_COLOR` | Color | Preset name, hex code, or ANSI index |
+| `PLAQQ_FONT` | Font | `block`, `heavy`, or `compact` |
+| `PLAQQ_BOLD` | Bold | `true` or `false` |
+| `PLAQQ_HINT` | Hint text | String |
+| `PLAQQ_NO_HINT` | Hide hint | `true` or `false` |
+
+> [!NOTE]
+> These style variables are unrelated to `PLAQQ_CONFIG`, which is used solely to override the path to the TOML configuration file.
+
+#### Error Handling for Invalid Values
+
+To avoid rendering failures in background/ambient scripts, environment variables are treated gently:
+- If you supply an invalid style value via a **CLI flag** or **config file**, `plaqq` exits immediately with a **hard error**.
+- If you supply an invalid style value via an **environment variable** or **session state**, `plaqq` prints a warning to `stderr` and safely falls back/degrades to the next priority level without halting.
+
+### Per-Terminal Session State
+
+Since children cannot alter their parent shell's environment variables, `plaqq` manages a temporary session-state store keyed by the parent shell's process ID (`os.Getppid()`). This allows styling choices to stick to a specific terminal pane/window.
+
+- **Storage**: Written as TOML to `$XDG_RUNTIME_DIR/plaqq/` (or fallback temp folder) with restricted permissions (`0600`). It is automatically cleaned up when the user logs out.
+- **Precedence Caveat**: Session state sits **above** environment variables. If you customize the session or set session state, a later `export PLAQQ_COLOR=...` in the same terminal pane will be overridden by the session state. Run `plaqq config --session --clear` to clear the session state and allow environment variables to take effect again.
+
+#### Per-Pane Recipes
+
+- **Interactively Customise**: Run bare `plaqq` with no arguments, fill in the message, and select **Customise**. Your choices will be saved to the session state for subsequent invocations in this pane.
+- **Manually Save Session Style**: Use the `--session` flag with `--color` or `--font` to save styling to the current terminal pane:
+  ```bash
+  plaqq config --session --color alert --font heavy
+  ```
+- **Clear Session Style**: Reset the styling for the current shell pane back to config/env/built-in defaults:
+  ```bash
+  plaqq config --session --clear
+  ```
+- **Interactive Picker for Session**: Run `plaqq config --session` to select styling choices using an interactive picker:
+  ```bash
+  plaqq config --session
+  ```
+- **Environment Fallback**: You can also use standard shell exports for pane-wide fallback:
+  ```bash
+  export PLAQQ_COLOR=warn
+  export PLAQQ_FONT=compact
+  ```
+
+### Interactive Confirm/Customise Flow
+
+Running `plaqq` with no message arguments in an interactive terminal brings up an interactive form:
+1. **Notice Message Input**: Enter your message.
+2. **Action Select**:
+   - **Confirm — show it now** (default): Renders the notice immediately using the resolved style.
+   - **Customise — pick font & color**: Opens a second step to select the font and color. Submitting will save these styling options to the session state and render the notice using them.
+   
+You can navigate back and forth between the steps using `Tab` and `Shift+Tab`.
+
+If `plaqq` is run without a message argument in a non-interactive terminal (e.g. CI, piped stdin) or with the `--json-output` flag, it exits with code `1` and prints `a message is required` to stderr (or JSON) rather than hanging.
+
 
 ### Message History
 
