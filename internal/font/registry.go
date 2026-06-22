@@ -44,17 +44,28 @@ func Has(name string) bool {
 	return ok
 }
 
-// Names returns every registered font name, sorted with the default first.
+// Names returns font names in their curated display order, with any unexpected
+// extras sorted after the built-ins.
 func Names() []string {
+	preferred := []string{DefaultName, "heavy", "compact"}
 	names := make([]string, 0, len(registry))
-	for n := range registry {
-		if n == DefaultName {
+	seen := make(map[string]struct{}, len(preferred))
+	for _, name := range preferred {
+		if _, ok := registry[name]; ok {
+			names = append(names, name)
+			seen[name] = struct{}{}
+		}
+	}
+
+	var extras []string
+	for name := range registry {
+		if _, ok := seen[name]; ok {
 			continue
 		}
-		names = append(names, n)
+		extras = append(extras, name)
 	}
-	sort.Strings(names)
-	return append([]string{DefaultName}, names...)
+	sort.Strings(extras)
+	return append(names, extras...)
 }
 
 // Wrap splits text into lines whose rendered width in font f does not exceed

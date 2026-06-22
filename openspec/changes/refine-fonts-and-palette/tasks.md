@@ -40,14 +40,14 @@ Ordered so the preview/test tooling lands before glyph authoring.
 
 ## 3. Colours: 5 semantic adaptive presets
 
-- [ ] 3.1 Rewrite `internal/cmd/styles.go`: `alert`/`warn`/`info`/`ok`/`focus` as
+- [x] 3.1 Rewrite `internal/cmd/styles.go`: `alert`/`warn`/`info`/`ok`/`focus` as
   `lipgloss.AdaptiveColor` Light/Dark pairs; `info` is the default; remove the old
   10 presets. Replace `presetOrder` with the new five-name slice **under a name
   the call sites keep using** (`root.go:36` flag help and `root.go:75` error both
   interpolate `presetOrder`) so the build doesn't break.
-- [ ] 3.2 Tune each Light/Dark pair for contrast on both backgrounds (eyeball via
+- [x] 3.2 Tune each Light/Dark pair for contrast on both backgrounds (eyeball via
   a temporary render; keep the current adaptive teal as `info`).
-- [ ] 3.3 Keep `parseColor` accepting hex + ANSI index; update the preset branch
+- [x] 3.3 Keep `parseColor` accepting hex + ANSI index; update the preset branch
   and its valid-name list.
 - [ ] 3.4 Fix stale literal strings that won't self-update: `root.go` `Long`/
   `Example` (old preset list, `--font slant`), `config.Template` comments
@@ -57,14 +57,14 @@ Ordered so the preview/test tooling lands before glyph authoring.
 
 ## 4. Hard-error resolution
 
-- [ ] 4.1 In `internal/cmd/root.go`, reject an unknown named font/colour at style
+- [x] 4.1 In `internal/cmd/root.go`, reject an unknown named font/colour at style
   resolution (before any `font.Get` fallback) with a non-zero exit and a message
   listing valid names — for both flags and config-file values. Structure this
   per-source: `style-config-ergonomics` adds env/session layers that must *warn*
   rather than error, so resolution needs to know which layer a value came from.
-- [ ] 4.2 On an unknown name, list the valid options and, when the input is a
+- [x] 4.2 On an unknown name, list the valid options and, when the input is a
   near-match (small edit distance), append a "did you mean X?" suggestion.
-- [ ] 4.3 Tests: unknown font and unknown colour each error and name the valid
+- [x] 4.3 Tests: unknown font and unknown colour each error and name the valid
   options (and suggest a near-match where applicable); valid presets/hex/ANSI
   still succeed.
 
