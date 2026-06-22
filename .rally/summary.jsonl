@@ -15,3 +15,4 @@
 {"run_id":"relay-2-run-14","summary":"Verified the colour/error-resolution slice, fixed curated font ordering in runtime listings, and checked off OpenSpec tasks 3.1-3.3 and 4.1-4.3.","updated_at":"2026-06-22T09:21:41Z","laps_completed":["plaq-6ec3"]}
 {"run_id":"relay-2-run-15","summary":"Corrected stale help/template/label strings, made config picker tolerant of invalid styles by seeding defaults, and added picker tests","updated_at":"2026-06-22T09:27:20Z","laps_completed":["plaq-a613"]}
 {"run_id":"relay-2-run-16","summary":"Documented refined fonts, semantic adaptive palette, strict validation, and breaking changes in README.md, AGENTS.md, and CHANGELOG.md","updated_at":"2026-06-22T09:32:11Z","laps_completed":["plaq-7444"]}
+{"run_id":"relay-2-run-17","summary":"Verified refine-fonts-and-palette end-to-end, fixed final accuracy gaps, and marked all change tasks complete.","updated_at":"2026-06-22T09:38:29Z","laps_completed":["plaq-2699"]}
