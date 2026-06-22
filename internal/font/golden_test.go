@@ -51,18 +51,11 @@ func TestCharsetCoverage(t *testing.T) {
 	for _, name := range targetFonts {
 		t.Run(name, func(t *testing.T) {
 			f := Get(name)
-			
-			// 1. If it's the block (default/legacyBlock) font, check letters map
-			if name == "block" {
-				for _, r := range charsetRunes {
-					if _, ok := letters[r]; !ok {
-						t.Errorf("legacy letters map missing rune %q", string(r))
-					}
-				}
-				return
-			}
 
-			// 2. Otherwise, check if it's a *Block font
+			// Each target font is a *Block; assert its glyph map covers the
+			// full charset. (Assert against map keys, not rendered output:
+			// '?' is also the not-found marker, so checking output would
+			// false-positive.)
 			bf, ok := f.(*Block)
 			if !ok {
 				t.Fatalf("font %q is not a *Block font (currently %T)", name, f)

@@ -57,20 +57,6 @@ func Names() []string {
 	return append([]string{DefaultName}, names...)
 }
 
-// legacyBlock adapts the original 5-row chunky block glyphs (RenderString /
-// StringWidth) to the Font interface so the default font and its helpers stay
-// byte-for-byte compatible with earlier releases.
-type legacyBlock struct{}
-
-func (legacyBlock) Render(line string) []string {
-	rows := RenderString(line)
-	return rows[:]
-}
-
-func (legacyBlock) Width(s string) int { return StringWidth(s) }
-
-func init() { register(DefaultName, legacyBlock{}) }
-
 // Wrap splits text into lines whose rendered width in font f does not exceed
 // maxWidth. It greedily packs whole words and never splits a single word that
 // is itself wider than maxWidth.
