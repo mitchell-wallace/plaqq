@@ -34,30 +34,30 @@
 
 ## 3. `plaqq config --session`
 
-- [ ] 3.1 Add `--session` and `--clear` to the `config` command
+- [x] 3.1 Add `--session` and `--clear` to the `config` command
   (`internal/cmd/config.go`): `--session` writes the session-state record (from
   `--color`/`--font` if given, else via the interactive picker — reuse the
   tolerant picker so an invalid existing session/config value seeds as default
   rather than erroring), `--clear` removes it. No `eval` required.
-- [ ] 3.2 Tests: `--session --color/--font` writes the record; `--clear` removes
+- [x] 3.2 Tests: `--session --color/--font` writes the record; `--clear` removes
   it.
 
 ## 4. Interactive confirm/customise flow with back-navigation
 
-- [ ] 4.1 Rebuild the bare-invocation path (`root.go`) as one `huh.Form`:
+- [x] 4.1 Rebuild the bare-invocation path (`root.go`) as one `huh.Form`:
   group 1 = message `Input` + Confirm/Customise `Select` (Confirm default);
   group 2 (font + colour `Select`s, seeded from the resolved style) shown via
   `WithHideFunc` only when Customise is chosen — so the user can `shift+tab` back
   to edit the message.
-- [ ] 4.2 On submit with Customise: write font+colour to the session-state store
+- [x] 4.2 On submit with Customise: write font+colour to the session-state store
   AND render this notice with them. On Confirm: render with the resolved style.
-- [ ] 4.3 Keep the message-argument path immediate (no choice step); preserve
+- [x] 4.3 Keep the message-argument path immediate (no choice step); preserve
   clean exit on Esc/Ctrl-C at every step.
-- [ ] 4.4 Guard non-interactive use: when there is no message arg and stdin is not
+- [x] 4.4 Guard non-interactive use: when there is no message arg and stdin is not
   an interactive TTY (`golang.org/x/term.IsTerminal`) or `--json-output` is set,
   exit via `exit()` with "a message is required" instead of launching any form.
   (Also covers today's latent `huh.NewInput()` hang under `--json-output`.)
-- [ ] 4.5 Tests where feasible (selection + persistence plumbing; non-TTY guard
+- [x] 4.5 Tests where feasible (selection + persistence plumbing; non-TTY guard
   errors); manual check of the TUI flow incl. back-navigation.
 
 ## 5. Docs
