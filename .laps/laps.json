@@ -115,11 +115,11 @@
       "title": "Update stale strings and config picker tolerance",
       "description": "Context: refine-fonts-and-palette tasks 3.4, 5.1-5.2. Outcome: (a) literal strings that do not self-update are corrected — root.go Long and Example (old preset list, --font slant), config.Template comments in internal/config/config.go, and the config.go default labels (colorDefaultChoice 'adaptive teal', configSummary 'teal' fallback); (b) the interactive `plaqq config` picker tolerates an invalid stored font/colour by seeding it as the default (block / info) instead of erroring, and fontOptions/colorOptions are updated to the new sets. Files \u0026 scope: internal/cmd/root.go (help text only), internal/cmd/config.go, internal/config/config.go. Design: keep the render-time hard-error from the previous lap intact — the picker is the tolerant repair path, a different code path. Acceptance: all help/template/label strings reference only block/heavy/compact and the five semantic colours; the picker opens with defaults when a stored value is unknown and saves only valid values; a picker test is added. Do not tick tasks.md.",
       "assignee": "JUNIOR",
-      "isDone": false,
+      "isDone": true,
       "order": 655360,
       "createdAt": "2026-06-19T06:35:14.477185551Z",
-      "updatedAt": "2026-06-19T06:35:14.477185551Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T09:26:42.261712392Z",
+      "completedAt": "2026-06-22T09:26:42.261712392Z"
     },
     {
       "id": "plaq-7444",
