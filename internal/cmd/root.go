@@ -33,7 +33,7 @@ var (
 
 func init() {
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json-output", false, "emit structured JSON output")
-	rootCmd.Flags().StringVar(&flagColor, "color", "", "notice color: a preset name ("+strings.Join(presetOrder, ", ")+"), a hex code (e.g. #00f5d4), or an ANSI index (0-255); defaults to adaptive teal")
+	rootCmd.Flags().StringVar(&flagColor, "color", "", "notice color: a preset name ("+strings.Join(presetOrder, ", ")+"), a hex code (e.g. #00f5d4), or an ANSI index (0-255); defaults to info")
 	rootCmd.Flags().StringVar(&flagFont, "font", "", "font to render the notice in; one of: "+strings.Join(font.Names(), ", "))
 	rootCmd.Flags().BoolVar(&flagBold, "bold", true, "render the notice text in bold")
 	rootCmd.Flags().StringVar(&flagHint, "hint", defaultHint, "dismiss-hint text shown beneath the notice")
@@ -320,11 +320,10 @@ The font, color, bold weight, and dismiss hint can be customized with the
 --font, --color, --bold, --hint, and --no-hint flags, or set as persistent
 defaults via 'plaqq config' (an interactive picker). Flags override the config.
 
-Colors accept a preset name (teal, coral, amber, lime, azure, violet, magenta,
-rose, crimson, slate), a hex code, or an ANSI index. Fonts include Unicode
+Colors accept a preset name (info, alert, warn, ok, focus), a hex code, or an ANSI index. Fonts include Unicode
 block faces (block, heavy, compact).`,
 	Example: `  plaqq "deploy starting"
-  plaqq --color coral "build failed"
+  plaqq --color alert "build failed"
   plaqq --font heavy --color "#ff5f87" "build failed"
   plaqq --font compact --bold=false "heads up"
   plaqq --hint "press space to continue" "meeting in 5"

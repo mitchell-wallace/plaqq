@@ -14,7 +14,7 @@ import (
 
 // Sentinel Select values for the color field that are not preset names.
 const (
-	colorDefaultChoice = "default — adaptive teal"
+	colorDefaultChoice = "default — info"
 	colorCustomChoice  = "custom hex / ANSI…"
 )
 
@@ -90,38 +90,81 @@ var configInitCmd = &cobra.Command{
 	},
 }
 
-// runConfigPicker presents an interactive form seeded with the current config,
-// then writes the chosen styling back to path.
-func runConfigPicker(path string, cfg *config.Config) error {
-	// Seed form state from the current config, falling back to built-in defaults.
-	fontChoice := font.DefaultName
+// seedFormState determines the initial values for the interactive picker,
+// defaulting any invalid or unknown values to the built-in defaults (block / info).
+func seedFormState(cfg *config.Config) (fontChoice string, colorChoice string, customColor string, bold bool, showHint bool, hintText string) {
+	fontChoice = font.DefaultName
 	if cfg.Font != nil && *cfg.Font != "" {
-		fontChoice = *cfg.Font
-	}
-
-	colorChoice := colorDefaultChoice
-	customColor := ""
-	if cfg.Color != nil {
-		if _, ok := presetColor(*cfg.Color); ok {
-			colorChoice = strings.ToLower(strings.TrimSpace(*cfg.Color))
-		} else {
-			colorChoice = colorCustomChoice
-			customColor = *cfg.Color
+		val := strings.TrimSpace(*cfg.Font)
+		if font.Has(val) {
+			fontChoice = val
 		}
 	}
 
-	bold := true
+	colorChoice = colorDefaultChoice
+	customColor = ""
+	if cfg.Color != nil && *cfg.Color != "" {
+		val := strings.TrimSpace(*cfg.Color)
+		if _, ok := presetColor(val); ok {
+			colorChoice = strings.ToLower(val)
+		} else if _, err := parseColor(val); err == nil {
+			colorChoice = colorCustomChoice
+			customColor = val
+		}
+	}
+
+	bold = true
 	if cfg.Bold != nil {
 		bold = *cfg.Bold
 	}
-	showHint := true
+	showHint = true
 	if cfg.NoHint != nil {
 		showHint = !*cfg.NoHint
 	}
-	hintText := defaultHint
+	hintText = defaultHint
 	if cfg.Hint != nil {
 		hintText = *cfg.Hint
 	}
+	return
+}
+
+// buildSavedConfig creates a Config object from the picker choices.
+// Fields left at their built-in default are omitted (left nil) so the saved file remains minimal.
+func buildSavedConfig(fontChoice, colorChoice, customColor string, bold, showHint bool, hintText string) *config.Config {
+	out := &config.Config{}
+	if fontChoice != "" && fontChoice != font.DefaultName {
+		f := fontChoice
+		out.Font = &f
+	}
+	switch colorChoice {
+	case colorDefaultChoice:
+		// leave nil -> built-in info
+	case colorCustomChoice:
+		if c := strings.TrimSpace(customColor); c != "" {
+			if _, err := parseColor(c); err == nil {
+				out.Color = &c
+			}
+		}
+	default:
+		c := colorChoice
+		out.Color = &c
+	}
+	b := bold
+	out.Bold = &b
+	nh := !showHint
+	out.NoHint = &nh
+	if showHint {
+		if h := strings.TrimSpace(hintText); h != "" && h != defaultHint {
+			out.Hint = &h
+		}
+	}
+	return out
+}
+
+// runConfigPicker presents an interactive form seeded with the current config,
+// then writes the chosen styling back to path.
+func runConfigPicker(path string, cfg *config.Config) error {
+	fontChoice, colorChoice, customColor, bold, showHint, hintText := seedFormState(cfg)
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -163,33 +206,7 @@ func runConfigPicker(path string, cfg *config.Config) error {
 		return err
 	}
 
-	// Build a config from the choices. Fields left at their built-in default are
-	// omitted so the saved file stays minimal.
-	out := &config.Config{}
-	if fontChoice != "" && fontChoice != font.DefaultName {
-		f := fontChoice
-		out.Font = &f
-	}
-	switch colorChoice {
-	case colorDefaultChoice:
-		// leave nil -> built-in adaptive teal
-	case colorCustomChoice:
-		if c := strings.TrimSpace(customColor); c != "" {
-			out.Color = &c
-		}
-	default:
-		c := colorChoice
-		out.Color = &c
-	}
-	b := bold
-	out.Bold = &b
-	nh := !showHint
-	out.NoHint = &nh
-	if showHint {
-		if h := strings.TrimSpace(hintText); h != "" && h != defaultHint {
-			out.Hint = &h
-		}
-	}
+	out := buildSavedConfig(fontChoice, colorChoice, customColor, bold, showHint, hintText)
 
 	if err := config.Save(path, out); err != nil {
 		return err
@@ -246,7 +263,7 @@ func configSummary(cfg *config.Config) string {
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "  color    %s\n", str(cfg.Color, "teal"))
+	fmt.Fprintf(&b, "  color    %s\n", str(cfg.Color, "info"))
 	fmt.Fprintf(&b, "  font     %s\n", str(cfg.Font, font.DefaultName))
 	fmt.Fprintf(&b, "  bold     %s\n", boolStr(cfg.Bold, true))
 	fmt.Fprintf(&b, "  hint     %s\n", str(cfg.Hint, defaultHint))

@@ -27,10 +27,9 @@ const Template = `# plaqq configuration
 # Styling defaults for the notice. CLI flags override anything set here.
 # Tip: run 'plaqq config' (no subcommand) for an interactive editor.
 
-# Notice text color: a preset name ("teal", "coral", "amber", "lime", "azure",
-# "violet", "magenta", "rose", "crimson", "slate"), a hex code (e.g. "#00f5d4"),
-# or an ANSI index ("0"-"255"). Defaults to an adaptive teal.
-# color = "teal"
+# Notice text color: a preset name ("info", "alert", "warn", "ok", "focus"),
+# a hex code (e.g. "#00f5d4"), or an ANSI index ("0"-"255"). Defaults to info.
+# color = "info"
 
 # Font used to render the notice. Block fonts: "block" (default), "heavy",
 # "compact".
