@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -74,6 +75,84 @@ func TestResolveStyleConfigThenFlagOverride(t *testing.T) {
 	}
 }
 
+func TestRunERejectsUnknownFontFlagBeforeFallback(t *testing.T) {
+	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "none.toml"))
+	cmd := newStyleFlagCmd()
+	if err := cmd.Flags().Set("font", "heavyy"); err != nil {
+		t.Fatal(err)
+	}
+
+	err := rootCmd.RunE(cmd, []string{"hi"})
+	requireErrorContains(t, err,
+		`unknown font "heavyy"`,
+		"from --font flag",
+		"block",
+		"heavy",
+		"compact",
+		`did you mean "heavy"?`,
+	)
+}
+
+func TestResolveStyleRejectsUnknownColorFlag(t *testing.T) {
+	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "none.toml"))
+	cmd := newStyleFlagCmd()
+	if err := cmd.Flags().Set("color", "infp"); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := resolveStyle(cmd)
+	requireErrorContains(t, err,
+		`unknown color "infp"`,
+		"from --color flag",
+		"alert",
+		"warn",
+		"info",
+		"ok",
+		"focus",
+		`did you mean "info"?`,
+	)
+}
+
+func TestResolveStyleRejectsUnknownFontConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("font = \"heavyy\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PLAQQ_CONFIG", path)
+	cmd := newStyleFlagCmd()
+
+	_, err := resolveStyle(cmd)
+	requireErrorContains(t, err,
+		`unknown font "heavyy"`,
+		"from config file",
+		"block",
+		"heavy",
+		"compact",
+		`did you mean "heavy"?`,
+	)
+}
+
+func TestResolveStyleRejectsUnknownColorConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("color = \"alret\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PLAQQ_CONFIG", path)
+	cmd := newStyleFlagCmd()
+
+	_, err := resolveStyle(cmd)
+	requireErrorContains(t, err,
+		`unknown color "alret"`,
+		"from config file",
+		"alert",
+		"warn",
+		"info",
+		"ok",
+		"focus",
+		`did you mean "alert"?`,
+	)
+}
+
 func TestParseColor(t *testing.T) {
 	valid := []string{"#fff", "#00f5d4", "#ABCDEF", "0", "255", "213", " #fff ", "info", "Alert", "FOCUS"}
 	for _, s := range valid {
@@ -86,6 +165,19 @@ func TestParseColor(t *testing.T) {
 	for _, s := range invalid {
 		if _, err := parseColor(s); err == nil {
 			t.Errorf("parseColor(%q) expected error, got nil", s)
+		}
+	}
+}
+
+func requireErrorContains(t *testing.T, err error, substrs ...string) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	msg := err.Error()
+	for _, substr := range substrs {
+		if !strings.Contains(msg, substr) {
+			t.Fatalf("error %q does not contain %q", msg, substr)
 		}
 	}
 }

@@ -41,8 +41,13 @@ func init() {
 }
 
 // parseColor validates a user-supplied color string and returns the matching
-// lipgloss color. It accepts a hex code (#rgb or #rrggbb) or an ANSI index (0-255).
+// lipgloss color. It accepts a preset name, a hex code (#rgb or #rrggbb), or an
+// ANSI index (0-255).
 func parseColor(s string) (lipgloss.TerminalColor, error) {
+	return parseColorFromSource(s, styleValueSource{})
+}
+
+func parseColorFromSource(s string, source styleValueSource) (lipgloss.TerminalColor, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return nil, fmt.Errorf("color is empty")
@@ -55,11 +60,11 @@ func parseColor(s string) (lipgloss.TerminalColor, error) {
 	if strings.HasPrefix(s, "#") {
 		hex := s[1:]
 		if len(hex) != 3 && len(hex) != 6 {
-			return nil, fmt.Errorf("invalid hex color %q: expected #rgb or #rrggbb", s)
+			return nil, styleValueError(source, "invalid hex color %q: expected #rgb or #rrggbb", s)
 		}
 		for _, r := range hex {
 			if !isHexDigit(r) {
-				return nil, fmt.Errorf("invalid hex color %q", s)
+				return nil, styleValueError(source, "invalid hex color %q", s)
 			}
 		}
 		return lipgloss.Color(s), nil
@@ -67,16 +72,149 @@ func parseColor(s string) (lipgloss.TerminalColor, error) {
 
 	if n, err := strconv.Atoi(s); err == nil {
 		if n < 0 || n > 255 {
-			return nil, fmt.Errorf("invalid ANSI color %d: expected an index 0-255", n)
+			return nil, styleValueError(source, "invalid ANSI color %d: expected an index 0-255", n)
 		}
 		return lipgloss.Color(s), nil
 	}
 
-	return nil, fmt.Errorf("invalid color %q: use a preset name (%s), a hex code like #00f5d4, or an ANSI index 0-255", s, strings.Join(presetOrder, ", "))
+	return nil, unknownStyleValueError("color", s, source, presetOrder, "preset names", "; hex codes like #00f5d4 and ANSI indexes 0-255 are also valid")
 }
 
 func isHexDigit(r rune) bool {
 	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')
+}
+
+type invalidStyleValueAction int
+
+const (
+	invalidStyleValueError invalidStyleValueAction = iota
+	invalidStyleValueWarn
+)
+
+type styleValueSource struct {
+	label         string
+	invalidAction invalidStyleValueAction
+}
+
+var configStyleSource = styleValueSource{
+	label:         "config file",
+	invalidAction: invalidStyleValueError,
+}
+
+func flagStyleSource(name string) styleValueSource {
+	return styleValueSource{
+		label:         "--" + name + " flag",
+		invalidAction: invalidStyleValueError,
+	}
+}
+
+func (src styleValueSource) handleInvalid(err error) error {
+	switch src.invalidAction {
+	case invalidStyleValueWarn:
+		// Future env/session layers use this branch to warn and fall through.
+		return nil
+	default:
+		return err
+	}
+}
+
+func styleValueError(source styleValueSource, format string, args ...any) error {
+	msg := fmt.Sprintf(format, args...)
+	if source.label == "" {
+		return fmt.Errorf("%s", msg)
+	}
+	return fmt.Errorf("%s from %s", msg, source.label)
+}
+
+func unknownStyleValueError(kind, value string, source styleValueSource, options []string, optionLabel, suffix string) error {
+	var b strings.Builder
+	fmt.Fprintf(&b, "unknown %s %q", kind, value)
+	if source.label != "" {
+		fmt.Fprintf(&b, " from %s", source.label)
+	}
+	fmt.Fprintf(&b, ": valid %s are %s", optionLabel, strings.Join(options, ", "))
+	b.WriteString(suffix)
+	if suggestion, ok := suggestName(value, options); ok {
+		fmt.Fprintf(&b, "; did you mean %q?", suggestion)
+	}
+	return fmt.Errorf("%s", b.String())
+}
+
+func suggestName(input string, options []string) (string, bool) {
+	input = strings.ToLower(strings.TrimSpace(input))
+	if input == "" {
+		return "", false
+	}
+
+	best := ""
+	bestDistance := 0
+	tied := false
+	for _, option := range options {
+		d := editDistance(input, strings.ToLower(option))
+		if best == "" || d < bestDistance {
+			best = option
+			bestDistance = d
+			tied = false
+		} else if d == bestDistance {
+			tied = true
+		}
+	}
+	if best == "" || tied {
+		return "", false
+	}
+
+	limit := 2
+	if len([]rune(input)) > 6 || len([]rune(best)) > 6 {
+		limit = 3
+	}
+	if bestDistance > limit {
+		return "", false
+	}
+	return best, true
+}
+
+func editDistance(a, b string) int {
+	ar := []rune(a)
+	br := []rune(b)
+	if len(ar) == 0 {
+		return len(br)
+	}
+	if len(br) == 0 {
+		return len(ar)
+	}
+
+	prev := make([]int, len(br)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+
+	for i, ca := range ar {
+		curr := make([]int, len(br)+1)
+		curr[0] = i + 1
+		for j, cb := range br {
+			cost := 0
+			if ca != cb {
+				cost = 1
+			}
+			curr[j+1] = minInt(
+				curr[j]+1,
+				prev[j+1]+1,
+				prev[j]+cost,
+			)
+		}
+		prev = curr
+	}
+	return prev[len(br)]
+}
+
+func minInt(a, b, c int) int {
+	if b < a {
+		a = b
+	}
+	if c < a {
+		a = c
+	}
+	return a
 }
 
 // styleSettings is the effective notice styling after layering defaults, the
@@ -104,10 +242,14 @@ func resolveStyle(cmd *cobra.Command) (styleSettings, error) {
 		return styleSettings{}, err
 	}
 	if cfg.Color != nil {
-		s.color = *cfg.Color
+		if err := applyColorLayer(&s, *cfg.Color, configStyleSource); err != nil {
+			return styleSettings{}, err
+		}
 	}
 	if cfg.Font != nil {
-		s.font = *cfg.Font
+		if err := applyFontLayer(&s, *cfg.Font, configStyleSource); err != nil {
+			return styleSettings{}, err
+		}
 	}
 	if cfg.Bold != nil {
 		s.bold = *cfg.Bold
@@ -120,10 +262,14 @@ func resolveStyle(cmd *cobra.Command) (styleSettings, error) {
 	}
 
 	if cmd.Flags().Changed("color") {
-		s.color = flagColor
+		if err := applyColorLayer(&s, flagColor, flagStyleSource("color")); err != nil {
+			return styleSettings{}, err
+		}
 	}
 	if cmd.Flags().Changed("font") {
-		s.font = flagFont
+		if err := applyFontLayer(&s, flagFont, flagStyleSource("font")); err != nil {
+			return styleSettings{}, err
+		}
 	}
 	if cmd.Flags().Changed("bold") {
 		s.bold = flagBold
@@ -136,6 +282,32 @@ func resolveStyle(cmd *cobra.Command) (styleSettings, error) {
 	}
 
 	return s, nil
+}
+
+func applyColorLayer(s *styleSettings, value string, source styleValueSource) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		s.color = ""
+		return nil
+	}
+	if _, err := parseColorFromSource(value, source); err != nil {
+		return source.handleInvalid(err)
+	}
+	s.color = value
+	return nil
+}
+
+func applyFontLayer(s *styleSettings, value string, source styleValueSource) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		s.font = ""
+		return nil
+	}
+	if !font.Has(value) {
+		return source.handleInvalid(unknownStyleValueError("font", value, source, font.Names(), "fonts", ""))
+	}
+	s.font = value
+	return nil
 }
 
 var rootCmd = &cobra.Command{
@@ -167,9 +339,6 @@ block faces (block, heavy, compact).`,
 			return err
 		}
 
-		if style.font != "" && !font.Has(style.font) {
-			return fmt.Errorf("unknown font %q: choose one of %s", style.font, strings.Join(font.Names(), ", "))
-		}
 		glyphFont := font.Get(style.font)
 
 		var noticeColor lipgloss.TerminalColor = lipgloss.AdaptiveColor{Light: "#00d7af", Dark: "#00f5d4"}

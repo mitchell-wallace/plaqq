@@ -93,11 +93,11 @@
       "title": "Source-aware hard-error resolution, parseColor, and did-you-mean",
       "description": "Context: refine-fonts-and-palette tasks 3.3, 4.1-4.3 and design '## Migration'. THIS IS THE SHARED SEAM with style-config-ergonomics — structure it per-source. Outcome: resolveStyle/RunE reject an unknown named font or colour coming from a CLI FLAG or the CONFIG FILE with a non-zero exit and a message that lists the valid names plus a 'did you mean X' near-match suggestion; parseColor accepts the five presets, hex, and ANSI index. Validation is per-source so a later change can make env/session layers WARN instead of erroring. Files \u0026 scope: internal/cmd/root.go (resolveStyle, RunE, parseColor) and a small edit-distance suggest helper. Do NOT add env or session layers here (that is the next change). Design: reject BEFORE font.Get's silent fallback; resolveStyle must know each value's origin (flag vs config) to choose fail-vs-(future)warn; hard-error for both flags and the config file (the config picker's tolerance is a separate path handled in a later lap). Acceptance: unknown --font/--color and unknown config values exit non-zero, list options, and suggest a near-match; valid preset/hex/ANSI still succeed; tests cover each. Do not tick tasks.md.",
       "assignee": "SENIOR",
-      "isDone": false,
+      "isDone": true,
       "order": 524288,
       "createdAt": "2026-06-19T06:35:14.477182821Z",
-      "updatedAt": "2026-06-19T06:35:14.477182821Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T09:14:21.81818196Z",
+      "completedAt": "2026-06-22T09:14:21.81818196Z"
     },
     {
       "id": "plaq-6ec3",
