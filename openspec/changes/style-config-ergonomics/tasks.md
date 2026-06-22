@@ -7,29 +7,29 @@
 
 ## 1. Session env-var layer (warn, don't fail)
 
-- [ ] 1.1 Add an env-reading step to `resolveStyle` (`internal/cmd/root.go`)
+- [x] 1.1 Add an env-reading step to `resolveStyle` (`internal/cmd/root.go`)
   between the config-file and session-state layers: `PLAQQ_COLOR`, `PLAQQ_FONT`,
   `PLAQQ_BOLD`, `PLAQQ_HINT`, `PLAQQ_NO_HINT`. Empty/unset → ignored. Make
   `resolveStyle` track each value's source so flag/config invalids error while
   env/session invalids warn (do not lean on `font.Get`'s silent fallback).
-- [ ] 1.2 Parse `PLAQQ_BOLD` / `PLAQQ_NO_HINT` with `strconv.ParseBool`; validate
+- [x] 1.2 Parse `PLAQQ_BOLD` / `PLAQQ_NO_HINT` with `strconv.ParseBool`; validate
   font/colour with the existing helpers.
-- [ ] 1.3 On any invalid env value: print a warning to stderr naming the variable,
+- [x] 1.3 On any invalid env value: print a warning to stderr naming the variable,
   ignore it, and fall through (never abort). Collect warnings and emit them before
   the interactive form *and* the alt-screen program start — do **not** defer them
   on a channel like the update-notice (`root.go:252`), which would misorder them.
-- [ ] 1.4 Tests: each var applies; invalid values warn + fall through (assert
+- [x] 1.4 Tests: each var applies; invalid values warn + fall through (assert
   stderr + that the notice still resolves); empty falls through.
 
 ## 2. Per-terminal session-state store
 
-- [ ] 2.1 Add a small store (e.g. `internal/session`) keyed by `os.Getppid()`,
+- [x] 2.1 Add a small store (e.g. `internal/session`) keyed by `os.Getppid()`,
   persisting at least font + colour as TOML under `$XDG_RUNTIME_DIR/plaqq/`
   (fallback `os.TempDir()`); `Load`/`Save`/`Clear`. Write atomically (temp file +
   `rename`, mode `0600`); a malformed/invalid record warns and is ignored.
-- [ ] 2.2 Read it as the session-state layer in `resolveStyle` (above env, below
+- [x] 2.2 Read it as the session-state layer in `resolveStyle` (above env, below
   flags); an invalid stored value warns + falls through (consistent with env).
-- [ ] 2.3 Tests: write then load round-trips; precedence vs env and flags; a
+- [x] 2.3 Tests: write then load round-trips; precedence vs env and flags; a
   fresh key has no state; clear removes it.
 
 ## 3. `plaqq config --session`
