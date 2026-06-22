@@ -71,11 +71,11 @@
       "title": "Verify the fonts phase",
       "description": "Use the openspec-verify-change skill against refine-fonts-and-palette, focused on the `fonts` capability (specs/fonts/spec.md). Confirm: exactly three fonts; uppercase coverage with equal-width rows (verified via glyph map keys, not rendered output); no runtime go-figure or rasterization; the gallery and golden/width/coverage harness present and green. Before any diff, identify the intended merge target from the user, PR metadata, repo docs, or recent history — do NOT assume main — then use `git diff \u003ctarget\u003e...HEAD`; identify this batch's first lap (the font-gallery lap) and treat earlier branch work as pre-existing; never rewrite git history. Trace the actual registered fonts and the deleted go-figure import, not just that tests pass. Check off the §1 and §2 tasks.md boxes only for work verified correct and thorough; for any substantive gap, add a focused head lap (`laps add head`) rather than fixing large work here.",
       "assignee": "VERIFY",
-      "isDone": false,
+      "isDone": true,
       "order": 393216,
       "createdAt": "2026-06-19T06:35:14.477180787Z",
-      "updatedAt": "2026-06-19T06:35:14.477180787Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T08:41:07.77073623Z",
+      "completedAt": "2026-06-22T08:41:07.77073623Z"
     },
     {
       "id": "plaq-939d",
