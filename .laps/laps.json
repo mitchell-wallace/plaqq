@@ -28,10 +28,20 @@
       "title": "Author the heavy (solid) font glyphs",
       "description": "Context: refine-fonts-and-palette design.md '## The 3 fonts', tasks 2.3. `heavy` is the solid, filled, loudest face; it is now a hand-authored static map and no longer derived from go-figure banner3. Outcome: `heavy` renders the full charset as a maximally bold solid-block figure that is still legible (do not fill to mush). Files \u0026 scope: only the `heavy` glyph map in internal/font/; eyeball in the gallery; make width + coverage pass for `heavy`. Design: visual design work, uppercase-only, equal-width rows per glyph; aim for the boldest of the three while keeping letterforms distinguishable. Acceptance: gallery shows a polished `heavy`; width + coverage green for `heavy`; golden snapshot generated. Do not tick tasks.md.",
       "assignee": "UI",
-      "isDone": false,
+      "isDone": true,
       "order": 196608,
       "createdAt": "2026-06-19T06:35:14.477175258Z",
-      "updatedAt": "2026-06-19T06:35:14.477175258Z",
+      "updatedAt": "2026-06-22T07:00:49.392428085Z",
+      "completedAt": "2026-06-22T07:00:49.392428085Z"
+    },
+    {
+      "id": "work-8f08",
+      "title": "Re-author the compact font: tr...",
+      "description": "Re-author the compact font: transcribe TOIlet pagga.tlf (WTFPL, verified MIT-compatible) into internal/font/compact.go covering the full charset (incl. missing ; \u0026 %), map ░-\u003espace, record provenance header, regenerate compact.golden, and validate gofmt/vet/build/test + gallery eyeball. Full recipe in prior run's handoff summary.",
+      "isDone": false,
+      "order": 196608,
+      "createdAt": "2026-06-22T08:20:59.932282699Z",
+      "updatedAt": "2026-06-22T08:20:59.932282699Z",
       "completedAt": null
     },
     {
