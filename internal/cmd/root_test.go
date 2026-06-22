@@ -75,7 +75,7 @@ func TestResolveStyleConfigThenFlagOverride(t *testing.T) {
 }
 
 func TestParseColor(t *testing.T) {
-	valid := []string{"#fff", "#00f5d4", "#ABCDEF", "0", "255", "213", " #fff ", "teal", "Coral", "MAGENTA"}
+	valid := []string{"#fff", "#00f5d4", "#ABCDEF", "0", "255", "213", " #fff ", "info", "Alert", "FOCUS"}
 	for _, s := range valid {
 		if _, err := parseColor(s); err != nil {
 			t.Errorf("parseColor(%q) returned error: %v", s, err)
