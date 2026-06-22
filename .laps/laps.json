@@ -225,11 +225,11 @@
       "title": "Final verification: style-config-ergonomics",
       "description": "Full-change verification for style-config-ergonomics. Use the openspec-verify-change skill across the whole change and inspect the entire batch diff. First identify the intended merge target from the user/PR/repo history (do NOT assume main) and this batch's first lap (the session-store lap), treating earlier work — including the entire refine-fonts-and-palette change — as pre-existing baseline; never rewrite git history. Run a gofmt check, `go vet ./...`, `go build ./...`, and `go test ./...`; smoke-check that a bad PLAQQ_* warns and still renders, that customise in one pane sticks for that pane only, that back-navigation edits the message, and that `--session --clear` resets; run `openspec validate style-config-ergonomics --strict`. Check off every remaining tasks.md box verified done; add a focused head lap for any gap.",
       "assignee": "VERIFY",
-      "isDone": false,
+      "isDone": true,
       "order": 1310720,
       "createdAt": "2026-06-19T06:35:14.477207342Z",
-      "updatedAt": "2026-06-19T06:35:14.477207342Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T11:02:24.476470046Z",
+      "completedAt": "2026-06-22T11:02:24.476470046Z"
     }
   ]
 }
