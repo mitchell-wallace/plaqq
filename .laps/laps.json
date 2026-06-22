@@ -192,11 +192,11 @@
       "title": "Build the confirm/customise interactive flow",
       "description": "Context: style-config-ergonomics tasks 4.1-4.5 and design '## Interactive flow' and '## Non-interactive'. This is a multi-state TUI flow. Outcome: bare `plaqq` (no message arg, interactive TTY) shows ONE huh.Form — group 1 is the message Input plus a Confirm/Customise Select (Confirm focused by default); group 2 is font + colour Selects shown via WithHideFunc only when Customise is chosen, each seeded from the resolved style. The user can navigate back (shift+tab) to edit the message after entering customise. Confirm renders with the resolved style; Customise writes the chosen font+colour to the session-state store AND renders this notice with them, so the next plaqq in that pane reuses them. `plaqq \"msg\"` (arg present) stays immediate. When there is no message arg and stdin is not an interactive TTY, or --json-output is set, exit via exit() with 'a message is required' instead of launching the form (this also fixes today's latent huh.NewInput hang under --json-output). Esc/Ctrl-C exits cleanly at every step. Files \u0026 scope: internal/cmd/root.go bare-invocation path; reuse internal/session and the config.go picker patterns; use golang.org/x/term.IsTerminal for the guard. Design: config.go already uses WithHideFunc on later groups — follow that pattern; seed the Select Value pointers from the resolved style before Run. Acceptance: manual TUI check of confirm, customise, and back-nav message edit; customise persists to the session (next plaqq reuses it); arg path immediate; the non-TTY/json guard errors cleanly; tests where feasible for the selection/persistence plumbing and the guard. Do not tick tasks.md.",
       "assignee": "UI",
-      "isDone": false,
+      "isDone": true,
       "order": 1114112,
       "createdAt": "2026-06-19T06:35:14.477194551Z",
-      "updatedAt": "2026-06-19T06:35:14.477194551Z",
-      "completedAt": null
+      "updatedAt": "2026-06-22T10:41:26.05829308Z",
+      "completedAt": "2026-06-22T10:41:26.05829308Z"
     },
     {
       "id": "plaq-5f26",
