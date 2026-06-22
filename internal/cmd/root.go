@@ -482,8 +482,8 @@ func (m model) View() string {
 	noticeStyle := lipgloss.NewStyle().Foreground(m.color).Bold(m.bold)
 
 	// Render each wrapped line as a block and center it. Each line is padded by
-	// one uniform amount so that fonts with ragged row widths (e.g. FIGlet)
-	// keep their columns aligned rather than shearing row by row.
+	// one uniform amount so that the rendered block keeps its columns aligned
+	// rather than shearing row by row.
 	var centeredRows []string
 	for idx, line := range lines {
 		if idx > 0 {

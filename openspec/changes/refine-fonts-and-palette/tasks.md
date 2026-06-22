@@ -49,7 +49,7 @@ Ordered so the preview/test tooling lands before glyph authoring.
   a temporary render; keep the current adaptive teal as `info`).
 - [x] 3.3 Keep `parseColor` accepting hex + ANSI index; update the preset branch
   and its valid-name list.
-- [ ] 3.4 Fix stale literal strings that won't self-update: `root.go` `Long`/
+- [x] 3.4 Fix stale literal strings that won't self-update: `root.go` `Long`/
   `Example` (old preset list, `--font slant`), `config.Template` comments
   (`internal/config/config.go`, lists removed presets/fonts), and `config.go`
   default labels (`colorDefaultChoice` "adaptive teal", `configSummary` "teal"
@@ -70,22 +70,22 @@ Ordered so the preview/test tooling lands before glyph authoring.
 
 ## 5. Config picker tolerance
 
-- [ ] 5.1 In `internal/cmd/config.go`, make the picker seed an invalid stored
+- [x] 5.1 In `internal/cmd/config.go`, make the picker seed an invalid stored
   font/colour as the default selection instead of erroring; update `fontOptions`
   / `colorOptions` to the new sets.
-- [ ] 5.2 Test: a config with a removed font/colour name still opens the picker
+- [x] 5.2 Test: a config with a removed font/colour name still opens the picker
   with defaults selected; saving writes only valid values.
 
 ## 6. Docs & changelog
 
-- [ ] 6.1 Update `README.md` (fonts, semantic palette, escape hatch, hard-error
+- [x] 6.1 Update `README.md` (fonts, semantic palette, escape hatch, hard-error
   behaviour) and `AGENTS.md` (font architecture, removed `go-figure`/FIGlet).
-- [ ] 6.2 Note the breaking removals (FIGlet fonts + old presets) in the release
+- [x] 6.2 Note the breaking removals (FIGlet fonts + old presets) in the release
   notes / changelog. Do **not** bump `VERSION` here — that triggers auto-tag on
   push; bump it as a deliberate release step.
 
 ## 7. Validate
 
-- [ ] 7.1 `gofmt -w`, `go vet ./...`, `go build ./...`, `go test ./...` all green.
-- [ ] 7.2 Run `cmd/fontgallery` and eyeball all three fonts end-to-end.
-- [ ] 7.3 `openspec validate refine-fonts-and-palette --strict`.
+- [x] 7.1 `gofmt -w`, `go vet ./...`, `go build ./...`, `go test ./...` all green.
+- [x] 7.2 Run `cmd/fontgallery` and eyeball all three fonts end-to-end.
+- [x] 7.3 `openspec validate refine-fonts-and-palette --strict`.

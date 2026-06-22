@@ -42,8 +42,6 @@ func TestEveryFontRenders(t *testing.T) {
 	}
 }
 
-const Charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?.,:;'-/&%() "
-
 // TestBlockRowWidths enforces the per-glyph equal-width invariant the renderer
 // relies on for the hand-authored block fonts.
 func TestBlockRowWidths(t *testing.T) {

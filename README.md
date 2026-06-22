@@ -1,8 +1,8 @@
 # plaqq
 
-`plaqq` is a lightweight Go CLI tool for displaying stylized notices in terminal panes. 
+`plaqq` is a lightweight Go CLI tool for displaying stylized notices in terminal panes.
 
-It takes any custom notice text, renders it in a centered, chunky ASCII block font using adaptive terminal styling, and prompts the user to dismiss it with a single keystroke.
+It takes any custom notice text, renders it in a centered, chunky Unicode block font using adaptive terminal styling, and prompts the user to dismiss it with a single keystroke.
 
 ---
 

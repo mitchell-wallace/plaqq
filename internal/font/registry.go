@@ -18,6 +18,10 @@ type Font interface {
 // DefaultName is the registry key for the built-in chunky block font.
 const DefaultName = "block"
 
+// Charset is the curated uppercase glyph coverage shared by the gallery and the
+// font tests: A-Z, 0-9, ! ? . , : ; ' - / & % ( ) plus space.
+const Charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?.,:;'-/&%() "
+
 var registry = map[string]Font{}
 
 // register adds a font under a lower-cased name. It is called from init

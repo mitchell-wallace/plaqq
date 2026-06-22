@@ -11,6 +11,6 @@ All notable changes to this project will be documented in this file.
 - **Strict Validation**: Invalid font or color preset names in CLI flags or config files now trigger a hard error (non-zero exit) with nearest-match suggestions, rather than silently falling back to defaults. (The `plaqq config` command remains tolerant to permit recovery).
 
 ### Added
-- **Hand-authored Fonts**: Added custom hand-authored glyph maps for `block` (clean 5-row medium block), `heavy` (5-row solid block), and `compact` (3-row half-block).
+- **Curated Fonts**: Added committed glyph maps for `block` (clean 5-row medium block), `heavy` (7-row solid block), and `compact` (3-row half-block transcribed from TOIlet `pagga`).
 - **Edit Distance Suggestions**: Displays spelling corrections for unrecognized presets (e.g., `did you mean "heavy"?`).
 - **Zero Runtime Dependencies**: Removed `go-figure` dependency, eliminating all external runtime font rendering libraries.
