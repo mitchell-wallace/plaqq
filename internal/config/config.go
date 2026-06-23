@@ -32,7 +32,7 @@ const Template = `# plaqq configuration
 # color = "info"
 
 # Font used to render the notice. Block fonts: "block" (default), "heavy",
-# "compact".
+# "compact", "wide".
 # font = "block"
 
 # Render the notice text in bold.

@@ -282,7 +282,7 @@ func runConfigPicker(path string, cfg *config.Config) error {
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("Font").
-				Description("block fonts render in Unicode blocks (block, heavy, compact)").
+				Description("block fonts render in Unicode blocks (block, heavy, compact, wide)").
 				Options(fontOptions()...).
 				Value(&fontChoice),
 			huh.NewSelect[string]().

@@ -8,7 +8,7 @@ It takes any custom notice text, renders it in a centered, chunky Unicode block 
 
 ## Features
 
-- **Three Fonts**: Ships three Unicode block faces: `block` (clean medium, default), `heavy` (solid filled block), and `compact` (dense 3-row half-block for tight spaces).
+- **Four Fonts**: Ships four Unicode block faces: `block` (clean medium, default), `heavy` (solid filled block), `compact` (dense 3-row half-block for tight spaces), and `wide` (a roomier, more open medium-weight face).
 - **Semantic Adaptive Palette**: Pick from five named semantic colors (`alert`, `warn`, `info` (default), `ok`, `focus`), each utilizing adaptive theme styling to look great on both light and dark terminal backgrounds.
 - **Escape Hatch**: Supply custom hex codes (e.g., `#00f5d4`) or ANSI color indexes (`0`-`255`) for personalized coloring.
 - **Strict Validation**: Invalid font or color preset names in CLI flags or config files trigger a non-zero exit status with a helpful suggestion message.
@@ -52,10 +52,11 @@ plaqq "remember to run e2e tests before pushing"
 
 The notice appearance can be customized with flags (run `plaqq -h` to see them all):
 
-*   **`--font`**: Font used to render the notice. Supported block faces: `block` (default), `heavy`, `compact`.
+*   **`--font`**: Font used to render the notice. Supported block faces: `block` (default), `heavy`, `compact`, `wide`.
     ```bash
     plaqq --font heavy "shipped"
     plaqq --font compact "heads up"
+    plaqq --font wide "all clear"
     ```
 *   **`--color`**: Notice text color. Can be a semantic preset (`alert`, `warn`, `info`, `ok`, `focus`), a hex code (`#00f5d4`), or an ANSI index (`0`-`255`). Defaults to `info` (an adaptive teal).
     ```bash
@@ -78,7 +79,7 @@ The notice appearance can be customized with flags (run `plaqq -h` to see them a
 If you specify an unknown named font or color preset (either via CLI flags or in the TOML configuration file), `plaqq` exits with a non-zero status and prints a list of valid choices along with a nearest-match suggestion if one exists:
 
 ```
-plaqq: unknown font "heavyy" from --font flag: valid fonts are block, heavy, compact; did you mean "heavy"?
+plaqq: unknown font "heavyy" from --font flag: valid fonts are block, heavy, compact, wide; did you mean "heavy"?
 ```
 
 **Exception**: The interactive config picker (`plaqq config`) is designed to tolerate invalid config files so that it remains usable as a repair path. It seeds invalid values with defaults, allowing you to select and save valid choices.
@@ -128,7 +129,7 @@ You can set ambient styles for your current shell pane using environment variabl
 | Environment Variable | Style Property | Expected Format |
 |---|---|---|
 | `PLAQQ_COLOR` | Color | Preset name, hex code, or ANSI index |
-| `PLAQQ_FONT` | Font | `block`, `heavy`, or `compact` |
+| `PLAQQ_FONT` | Font | `block`, `heavy`, `compact`, or `wide` |
 | `PLAQQ_BOLD` | Bold | `true` or `false` |
 | `PLAQQ_HINT` | Hint text | String |
 | `PLAQQ_NO_HINT` | Hide hint | `true` or `false` |

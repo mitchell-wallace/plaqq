@@ -4,7 +4,7 @@ import "testing"
 
 func TestNamesIncludeExpected(t *testing.T) {
 	got := Names()
-	want := []string{"block", "heavy", "compact"}
+	want := []string{"block", "heavy", "compact", "wide"}
 	if len(got) != len(want) {
 		t.Fatalf("Names() = %v; want exactly %v", got, want)
 	}
@@ -45,7 +45,7 @@ func TestEveryFontRenders(t *testing.T) {
 // TestBlockRowWidths enforces the per-glyph equal-width invariant the renderer
 // relies on for the hand-authored block fonts.
 func TestBlockRowWidths(t *testing.T) {
-	for _, name := range []string{"block", "heavy", "compact"} {
+	for _, name := range []string{"block", "heavy", "compact", "wide"} {
 		t.Run(name, func(t *testing.T) {
 			f := Get(name)
 			for _, r := range Charset {

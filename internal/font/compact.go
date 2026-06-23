@@ -13,8 +13,11 @@ package font
 // https://github.com/cacalabs/toilet (font: fonts/pagga.tlf). Transcription
 // rule: pagga's leading ░ pad column is dropped (inter-letter spacing is added
 // by the renderer) and its remaining ░ shade cells are mapped to spaces; the
-// ▀▄█ block cells are kept verbatim. pagga's `/` and `\` diagonals on `0` and
-// `Q` are preserved so 0 stays distinct from O.
+// ▀▄█ block cells are kept verbatim. pagga's `/` diagonal on `0` is preserved so
+// 0 stays distinct from O. Three glyphs were re-authored for legibility at this
+// tiny size and are original to plaqq: `Q` now reads as `O` with a solid
+// bottom-right tail block (replacing pagga's backslash tail), and `M`/`W` use a
+// connected bar plus a central tooth so they no longer collide with `H`/`U`.
 var compactGlyphs = map[rune][]string{
 	'A':  {"█▀█", "█▀█", "▀ ▀"},
 	'B':  {"█▀▄", "█▀▄", "▀▀ "},
@@ -28,17 +31,17 @@ var compactGlyphs = map[rune][]string{
 	'J':  {"▀▀█", "  █", "▀▀ "},
 	'K':  {"█ █", "█▀▄", "▀ ▀"},
 	'L':  {"█  ", "█  ", "▀▀▀"},
-	'M':  {"█▄█", "█ █", "▀ ▀"},
+	'M':  {"█▄█", "█┃█", "▀ ▀"},
 	'N':  {"█▀█", "█ █", "▀ ▀"},
 	'O':  {"█▀█", "█ █", "▀▀▀"},
 	'P':  {"█▀█", "█▀▀", "▀  "},
-	'Q':  {"▄▀▄", "█\\█", " ▀\\"},
+	'Q':  {"▄▀▄", "█ █", " ▀━"},
 	'R':  {"█▀▄", "█▀▄", "▀ ▀"},
 	'S':  {"█▀▀", "▀▀█", "▀▀▀"},
 	'T':  {"▀█▀", " █ ", " ▀ "},
 	'U':  {"█ █", "█ █", "▀▀▀"},
 	'V':  {"█ █", "▀▄▀", " ▀ "},
-	'W':  {"█ █", "█▄█", "▀ ▀"},
+	'W':  {"█ █", "█┃█", "▀▀▀"},
 	'X':  {"█ █", "▄▀▄", "▀ ▀"},
 	'Y':  {"█ █", " █ ", " ▀ "},
 	'Z':  {"▀▀█", "▄▀ ", "▀▀▀"},

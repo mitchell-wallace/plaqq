@@ -51,7 +51,7 @@ func Has(name string) bool {
 // Names returns font names in their curated display order, with any unexpected
 // extras sorted after the built-ins.
 func Names() []string {
-	preferred := []string{DefaultName, "heavy", "compact"}
+	preferred := []string{DefaultName, "heavy", "compact", "wide"}
 	names := make([]string, 0, len(registry))
 	seen := make(map[string]struct{}, len(preferred))
 	for _, name := range preferred {

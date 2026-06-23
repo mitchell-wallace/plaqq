@@ -543,7 +543,7 @@ The font, color, bold weight, and dismiss hint can be customized with the
 defaults via 'plaqq config' (an interactive picker). Flags override the config.
 
 Colors accept a preset name (info, alert, warn, ok, focus), a hex code, or an ANSI index. Fonts include Unicode
-block faces (block, heavy, compact).`,
+block faces (block, heavy, compact, wide).`,
 	Example: `  plaqq "deploy starting"
   plaqq --color alert "build failed"
   plaqq --font heavy --color "#ff5f87" "build failed"
@@ -691,7 +691,10 @@ func initialModel(text string, glyphFont font.Font, color lipgloss.TerminalColor
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.HideCursor
+	return tea.Batch(
+		tea.HideCursor,
+		tea.SetWindowTitle(m.text),
+	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

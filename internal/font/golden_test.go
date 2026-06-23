@@ -45,8 +45,8 @@ func TestFontGolden(t *testing.T) {
 func TestCharsetCoverage(t *testing.T) {
 	charsetRunes := []rune(Charset)
 
-	// We check the three target fonts: block, heavy, compact
-	targetFonts := []string{"block", "heavy", "compact"}
+	// We check the four target fonts: block, heavy, compact, wide
+	targetFonts := []string{"block", "heavy", "compact", "wide"}
 
 	for _, name := range targetFonts {
 		t.Run(name, func(t *testing.T) {

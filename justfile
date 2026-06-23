@@ -14,6 +14,14 @@ build:
 test:
 	go test ./...
 
+# Render every font to inspectable artifacts (PNG + .ansi + manifest.json) under
+# artifacts/visual/. The PNGs paint each terminal cell's exact sub-cell geometry,
+# so they show the true glyph shapes for design review without depending on a
+# system font. Inspect artifacts/visual/<font>.png; use the .ansi files for
+# exact cell-level debugging.
+visual:
+	go run ./cmd/fontgallery -out artifacts/visual
+
 # Run the linter
 lint:
 	which golangci-lint 2>/dev/null || curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b {{gopath}}/bin
