@@ -19,8 +19,8 @@ test:
 # so they show the true glyph shapes for design review without depending on a
 # system font. Inspect artifacts/visual/<font>.png; use the .ansi files for
 # exact cell-level debugging.
-visual:
-	go run ./cmd/fontgallery -out artifacts/visual
+visual *args:
+	go run ./cmd/fontgallery -out artifacts/visual {{args}}
 
 # Run the linter
 lint:

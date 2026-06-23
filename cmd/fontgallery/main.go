@@ -27,6 +27,7 @@ var sampleLines = []string{
 	"NOPQRSTUVWXYZ",
 	"0123456789",
 	"!?.,:;'-/&%()",
+	"@#$^*_=+<>`~[]{}",
 	"THE QUICK BROWN",
 	"FOX JUMPS OVER",
 	"THE LAZY DOG",
@@ -55,6 +56,7 @@ func main() {
 	cellW := flag.Int("cell-w", 16, "pixel width of one terminal cell")
 	cellH := flag.Int("cell-h", 28, "pixel height of one terminal cell")
 	stdout := flag.Bool("stdout", false, "also print rendered samples to stdout")
+	chars := flag.String("chars", "", "specific characters to render instead of the standard gallery")
 	flag.Parse()
 
 	fg := color.RGBA{0x00, 0xf5, 0xd4, 0xff} // adaptive "info" teal (dark variant)
@@ -65,12 +67,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	lines := sampleLines
+	if *chars != "" {
+		lines = []string{*chars}
+	}
+
 	m := manifest{
 		CellWidth:  *cellW,
 		CellHeight: *cellH,
 		Foreground: "#00f5d4",
 		Background: "#1b1b1b",
-		Samples:    sampleLines,
+		Samples:    lines,
 	}
 
 	for _, name := range font.Names() {
@@ -79,7 +86,7 @@ func main() {
 		// Stack every sample's rendered rows with one blank separator row
 		// between groups so glyphs and the pangram share one image.
 		var rows []string
-		for i, line := range sampleLines {
+		for i, line := range lines {
 			if i > 0 {
 				rows = append(rows, "")
 			}
@@ -108,7 +115,7 @@ func main() {
 			Height:  len(f.Render("A")),
 		})
 
-		if *stdout {
+		if *stdout || *chars != "" {
 			fmt.Printf("=== %s ===\n%s\n", name, ansi)
 		}
 	}

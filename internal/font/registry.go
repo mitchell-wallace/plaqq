@@ -20,7 +20,7 @@ const DefaultName = "block"
 
 // Charset is the curated uppercase glyph coverage shared by the gallery and the
 // font tests: A-Z, 0-9, ! ? . , : ; ' - / & % ( ) plus space.
-const Charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?.,:;'-/&%() "
+const Charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?.,:;'-/&%() @#$^*_=+<>`~[]{}"
 
 var registry = map[string]Font{}
 
