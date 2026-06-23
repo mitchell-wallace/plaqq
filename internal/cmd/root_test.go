@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/mitchell-wallace/plaqq/internal/font"
 	"github.com/mitchell-wallace/plaqq/internal/session"
@@ -537,3 +538,81 @@ func TestBareInvocationJSONOutputExitsForMessage(t *testing.T) {
 		t.Errorf("stderr = %q; want JSON error containing 'a message is required'", stderr)
 	}
 }
+
+func TestTUIScrolling(t *testing.T) {
+	// Initialize font and color presets
+	f := font.Get("block")
+	color, _ := parseColor("info")
+
+	// Create a model with a message long enough to wrap and exceed a small height.
+	msg := "HELLO WORLD THIS IS A VERY LONG TEST MESSAGE THAT WILL EXCEED THE HEIGHT OF THE VIEWPORT"
+	m := initialModel(msg, f, color, true, defaultHint, true)
+
+	// Simulate window size message (width 40, height 10)
+	m.width = 40
+	m.height = 10
+
+	// Get lines and check size
+	lines := m.getScreenLines()
+	if len(lines) <= m.height {
+		t.Fatalf("expected content lines (%d) to exceed height (%d)", len(lines), m.height)
+	}
+
+	maxScroll := m.maxScrollOffset()
+	if maxScroll <= 0 {
+		t.Fatalf("expected maxScrollOffset (%d) to be > 0", maxScroll)
+	}
+
+	// 1. Scroll Down ('j')
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	if cmd != nil {
+		t.Errorf("expected no command on scroll down key")
+	}
+	m2 := updatedModel.(*model)
+	if m2.scrollOffset != 1 {
+		t.Errorf("scrollOffset after 'j' = %d; want 1", m2.scrollOffset)
+	}
+
+	// 2. Scroll Up ('k')
+	updatedModel, _ = m2.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	m3 := updatedModel.(*model)
+	if m3.scrollOffset != 0 {
+		t.Errorf("scrollOffset after 'k' = %d; want 0", m3.scrollOffset)
+	}
+
+	// 3. Scroll Down (Arrow)
+	updatedModel, _ = m3.Update(tea.KeyMsg{Type: tea.KeyDown, Runes: []rune{}})
+	m4 := updatedModel.(*model)
+	if m4.scrollOffset != 1 {
+		t.Errorf("scrollOffset after 'down' = %d; want 1", m4.scrollOffset)
+	}
+
+	// 4. Scroll Up (Arrow)
+	updatedModel, _ = m4.Update(tea.KeyMsg{Type: tea.KeyUp, Runes: []rune{}})
+	m5 := updatedModel.(*model)
+	if m5.scrollOffset != 0 {
+		t.Errorf("scrollOffset after 'up' = %d; want 0", m5.scrollOffset)
+	}
+
+	// 5. Page Down
+	updatedModel, _ = m5.Update(tea.KeyMsg{Type: tea.KeyPgDown, Runes: []rune{}})
+	m6 := updatedModel.(*model)
+	if m6.scrollOffset != m.height/2 {
+		t.Errorf("scrollOffset after 'pgdown' = %d; want %d", m6.scrollOffset, m.height/2)
+	}
+
+	// 6. Page Up
+	updatedModel, _ = m6.Update(tea.KeyMsg{Type: tea.KeyPgUp, Runes: []rune{}})
+	m7 := updatedModel.(*model)
+	if m7.scrollOffset != 0 {
+		t.Errorf("scrollOffset after 'pgup' = %d; want 0", m7.scrollOffset)
+	}
+
+	// 7. Verify scrollbar elements in View
+	view := m.View()
+	// Since scrollbar is enabled, every line should have a scrollbar character at the end.
+	if !strings.Contains(view, "░") && !strings.Contains(view, "█") {
+		t.Errorf("expected view to render scrollbar characters ('░' or '█') in scrollable state")
+	}
+}
+

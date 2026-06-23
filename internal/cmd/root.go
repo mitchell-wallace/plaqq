@@ -669,14 +669,15 @@ block faces (block, heavy, compact, wide).`,
 }
 
 type model struct {
-	text     string
-	hint     string
-	font     font.Font
-	color    lipgloss.TerminalColor
-	width    int
-	height   int
-	bold     bool
-	showHint bool
+	text         string
+	hint         string
+	font         font.Font
+	color        lipgloss.TerminalColor
+	width        int
+	height       int
+	bold         bool
+	showHint     bool
+	scrollOffset int
 }
 
 func initialModel(text string, glyphFont font.Font, color lipgloss.TerminalColor, bold bool, hint string, showHint bool) model {
@@ -697,23 +698,9 @@ func (m *model) Init() tea.Cmd {
 	)
 }
 
-func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case " ", "enter", "esc", "ctrl+c", "q":
-			return m, tea.Quit
-		}
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-	}
-	return m, nil
-}
-
-func (m *model) View() string {
+func (m *model) getScreenLines() []string {
 	if m.width == 0 || m.height == 0 {
-		return ""
+		return nil
 	}
 
 	// Dynamic word wrapping with a margin
@@ -758,13 +745,10 @@ func (m *model) View() string {
 		}
 	}
 
-	chunkyBlock := strings.Join(centeredRows, "\n")
-
 	showHint := m.showHint && strings.TrimSpace(m.hint) != ""
 
 	// Stylize and center dismissal hint
 	var centeredHint string
-	contentHeight := len(centeredRows) // notice height
 	if showHint {
 		hintStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.AdaptiveColor{Light: "244", Dark: "242"}).
@@ -775,29 +759,144 @@ func (m *model) View() string {
 			hintPadding = 0
 		}
 		centeredHint = strings.Repeat(" ", hintPadding) + hintStyle.Render(m.hint)
-		contentHeight += 3 // spacing + hint height
 	}
 
-	// Center everything vertically
-	topPadding := (m.height - contentHeight) / 2
-	if topPadding < 0 {
-		topPadding = 0
-	}
-
-	var sb strings.Builder
-	sb.WriteString(strings.Repeat("\n", topPadding))
-	sb.WriteString(chunkyBlock)
+	var contentLines []string
+	contentLines = append(contentLines, centeredRows...)
 	if showHint {
-		sb.WriteString("\n\n\n") // Gap before hint
-		sb.WriteString(centeredHint)
+		contentLines = append(contentLines, "", "", centeredHint)
 	}
 
-	bottomPadding := m.height - topPadding - contentHeight
-	if bottomPadding > 0 {
-		sb.WriteString(strings.Repeat("\n", bottomPadding))
+	if len(contentLines) < m.height {
+		// Center everything vertically
+		topPadding := (m.height - len(contentLines)) / 2
+		bottomPadding := m.height - topPadding - len(contentLines)
+
+		var screenLines []string
+		for i := 0; i < topPadding; i++ {
+			screenLines = append(screenLines, "")
+		}
+		screenLines = append(screenLines, contentLines...)
+		for i := 0; i < bottomPadding; i++ {
+			screenLines = append(screenLines, "")
+		}
+		return screenLines
 	}
 
-	return sb.String()
+	return contentLines
+}
+
+func (m *model) maxScrollOffset() int {
+	lines := m.getScreenLines()
+	if len(lines) == 0 {
+		return 0
+	}
+	maxOffset := len(lines) - m.height
+	if maxOffset < 0 {
+		return 0
+	}
+	return maxOffset
+}
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case " ", "enter", "esc", "ctrl+c", "q":
+			return m, tea.Quit
+		case "up", "k":
+			if m.scrollOffset > 0 {
+				m.scrollOffset--
+			}
+		case "down", "j":
+			if m.scrollOffset < m.maxScrollOffset() {
+				m.scrollOffset++
+			}
+		case "pgup":
+			m.scrollOffset -= m.height / 2
+			if m.scrollOffset < 0 {
+				m.scrollOffset = 0
+			}
+		case "pgdown":
+			m.scrollOffset += m.height / 2
+			maxOffset := m.maxScrollOffset()
+			if m.scrollOffset > maxOffset {
+				m.scrollOffset = maxOffset
+			}
+		}
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		maxOffset := m.maxScrollOffset()
+		if m.scrollOffset > maxOffset {
+			m.scrollOffset = maxOffset
+		}
+	}
+	return m, nil
+}
+
+func (m *model) View() string {
+	if m.width == 0 || m.height == 0 {
+		return ""
+	}
+
+	screenLines := m.getScreenLines()
+	if len(screenLines) == 0 {
+		return ""
+	}
+
+	start := m.scrollOffset
+	if start > len(screenLines)-m.height {
+		start = len(screenLines) - m.height
+	}
+	if start < 0 {
+		start = 0
+	}
+
+	isScrollable := len(screenLines) > m.height
+	var visibleLines []string
+
+	thumbStyle := lipgloss.NewStyle().Foreground(m.color)
+	trackStyle := lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "250", Dark: "238"})
+
+	for i := 0; i < m.height; i++ {
+		lineIdx := start + i
+		if lineIdx >= len(screenLines) {
+			break
+		}
+		line := screenLines[lineIdx]
+		if isScrollable {
+			thumbHeight := m.height * m.height / len(screenLines)
+			if thumbHeight < 1 {
+				thumbHeight = 1
+			}
+			scrollableThumbRange := m.height - thumbHeight
+			scrollableOffsetRange := len(screenLines) - m.height
+
+			thumbStart := 0
+			if scrollableOffsetRange > 0 {
+				thumbStart = start * scrollableThumbRange / scrollableOffsetRange
+			}
+
+			isThumb := i >= thumbStart && i < thumbStart+thumbHeight
+			var sbChar string
+			if isThumb {
+				sbChar = thumbStyle.Render("█")
+			} else {
+				sbChar = trackStyle.Render("░")
+			}
+
+			w := lipgloss.Width(line)
+			paddingNeeded := m.width - 1 - w
+			if paddingNeeded < 0 {
+				paddingNeeded = 0
+			}
+			line = line + strings.Repeat(" ", paddingNeeded) + sbChar
+		}
+		visibleLines = append(visibleLines, line)
+	}
+
+	return strings.Join(visibleLines, "\n")
 }
 
 type exitError struct {

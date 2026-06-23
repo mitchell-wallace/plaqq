@@ -73,8 +73,8 @@ func Names() []string {
 }
 
 // Wrap splits text into lines whose rendered width in font f does not exceed
-// maxWidth. It greedily packs whole words and never splits a single word that
-// is itself wider than maxWidth.
+// maxWidth. It greedily packs whole words, splitting long words with hyphens
+// if they exceed maxWidth on their own.
 func Wrap(f Font, text string, maxWidth int) []string {
 	words := strings.Fields(text)
 	if len(words) == 0 {
@@ -84,20 +84,44 @@ func Wrap(f Font, text string, maxWidth int) []string {
 	var lines []string
 	var current []string
 
-	for _, word := range words {
+	for len(words) > 0 {
+		word := words[0]
+		words = words[1:]
+
 		joined := word
 		if len(current) > 0 {
 			joined = strings.Join(current, " ") + " " + word
 		}
+
 		if f.Width(joined) <= maxWidth {
 			current = append(current, word)
 		} else {
 			if len(current) > 0 {
 				lines = append(lines, strings.Join(current, " "))
-				current = []string{word}
-			} else {
-				lines = append(lines, word)
 				current = nil
+				// Re-process this word on a new, empty line
+				words = append([]string{word}, words...)
+			} else {
+				// The word is too wide for an empty line. Split it.
+				runes := []rune(word)
+				if len(runes) <= 1 {
+					// Cannot split. Just put it on the line.
+					lines = append(lines, word)
+				} else {
+					k := 1
+					for i := 2; i < len(runes); i++ {
+						if f.Width(string(runes[:i])+"-") <= maxWidth {
+							k = i
+						} else {
+							break
+						}
+					}
+					// Add prefix with hyphen to lines
+					lines = append(lines, string(runes[:k])+"-")
+					// Prepend the suffix to words to be processed next
+					suffix := string(runes[k:])
+					words = append([]string{suffix}, words...)
+				}
 			}
 		}
 	}
