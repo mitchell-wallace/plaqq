@@ -163,5 +163,5 @@ func warnf(w io.Writer, format string, args ...any) {
 	if w == nil {
 		return
 	}
-	fmt.Fprintf(w, "plaqq: warning: "+format+"\n", args...)
+	_, _ = fmt.Fprintf(w, "plaqq: warning: "+format+"\n", args...)
 }

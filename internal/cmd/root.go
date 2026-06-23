@@ -150,7 +150,7 @@ func warnStyleValue(err error) {
 	if styleWarningOutput == nil {
 		return
 	}
-	fmt.Fprintf(styleWarningOutput, "plaqq: warning: %v; ignoring value\n", err)
+	_, _ = fmt.Fprintf(styleWarningOutput, "plaqq: warning: %v; ignoring value\n", err)
 }
 
 func styleValueError(source styleValueSource, format string, args ...any) error {
@@ -416,7 +416,7 @@ const (
 // form can run: it needs an interactive stdin TTY and must not be in
 // --json-output mode (the form, like the old huh.NewInput prompt, cannot render
 // without a TTY).
-func interactiveFormAllowed(isTTY bool, jsonOut bool) bool {
+func interactiveFormAllowed(isTTY, jsonOut bool) bool {
 	return isTTY && !jsonOut
 }
 
@@ -648,7 +648,7 @@ block faces (block, heavy, compact, wide).`,
 
 		// Initialize Bubble Tea program
 		m := initialModel(noticeMsg, glyphFont, noticeColor, style.bold, style.hint, !style.noHint)
-		p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithoutCatchPanics())
+		p := tea.NewProgram(&m, tea.WithAltScreen(), tea.WithoutCatchPanics())
 		if _, err := p.Run(); err != nil {
 			return fmt.Errorf("run program: %w", err)
 		}
@@ -690,14 +690,14 @@ func initialModel(text string, glyphFont font.Font, color lipgloss.TerminalColor
 	}
 }
 
-func (m model) Init() tea.Cmd {
+func (m *model) Init() tea.Cmd {
 	return tea.Batch(
 		tea.HideCursor,
 		tea.SetWindowTitle(m.text),
 	)
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -711,7 +711,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) View() string {
+func (m *model) View() string {
 	if m.width == 0 || m.height == 0 {
 		return ""
 	}

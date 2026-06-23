@@ -202,42 +202,52 @@ var configInitCmd = &cobra.Command{
 	},
 }
 
+type formState struct {
+	fontChoice  string
+	colorChoice string
+	customColor string
+	bold        bool
+	showHint    bool
+	hintText    string
+}
+
 // seedFormState determines the initial values for the interactive picker,
 // defaulting any invalid or unknown values to the built-in defaults (block / info).
-func seedFormState(cfg *config.Config) (fontChoice string, colorChoice string, customColor string, bold bool, showHint bool, hintText string) {
-	fontChoice = font.DefaultName
+func seedFormState(cfg *config.Config) formState {
+	state := formState{
+		fontChoice:  font.DefaultName,
+		colorChoice: colorDefaultChoice,
+		bold:        true,
+		showHint:    true,
+		hintText:    defaultHint,
+	}
 	if cfg.Font != nil && *cfg.Font != "" {
 		val := strings.TrimSpace(*cfg.Font)
 		if font.Has(val) {
-			fontChoice = val
+			state.fontChoice = val
 		}
 	}
 
-	colorChoice = colorDefaultChoice
-	customColor = ""
 	if cfg.Color != nil && *cfg.Color != "" {
 		val := strings.TrimSpace(*cfg.Color)
 		if _, ok := presetColor(val); ok {
-			colorChoice = strings.ToLower(val)
+			state.colorChoice = strings.ToLower(val)
 		} else if _, err := parseColor(val); err == nil {
-			colorChoice = colorCustomChoice
-			customColor = val
+			state.colorChoice = colorCustomChoice
+			state.customColor = val
 		}
 	}
 
-	bold = true
 	if cfg.Bold != nil {
-		bold = *cfg.Bold
+		state.bold = *cfg.Bold
 	}
-	showHint = true
 	if cfg.NoHint != nil {
-		showHint = !*cfg.NoHint
+		state.showHint = !*cfg.NoHint
 	}
-	hintText = defaultHint
 	if cfg.Hint != nil {
-		hintText = *cfg.Hint
+		state.hintText = *cfg.Hint
 	}
-	return
+	return state
 }
 
 // buildSavedConfig creates a Config object from the picker choices.
@@ -276,7 +286,13 @@ func buildSavedConfig(fontChoice, colorChoice, customColor string, bold, showHin
 // runConfigPicker presents an interactive form seeded with the current config,
 // then writes the chosen styling back to path.
 func runConfigPicker(path string, cfg *config.Config) error {
-	fontChoice, colorChoice, customColor, bold, showHint, hintText := seedFormState(cfg)
+	state := seedFormState(cfg)
+	fontChoice := state.fontChoice
+	colorChoice := state.colorChoice
+	customColor := state.customColor
+	bold := state.bold
+	showHint := state.showHint
+	hintText := state.hintText
 
 	form := huh.NewForm(
 		huh.NewGroup(

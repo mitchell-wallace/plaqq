@@ -23,7 +23,8 @@ func TestSeedFormStateTolerance(t *testing.T) {
 		Color: &badColor,
 	}
 
-	fontChoice, colorChoice, customColor, bold, showHint, hintText := seedFormState(cfg1)
+	state1 := seedFormState(cfg1)
+	fontChoice, colorChoice, customColor, bold, showHint, hintText := state1.fontChoice, state1.colorChoice, state1.customColor, state1.bold, state1.showHint, state1.hintText
 
 	if fontChoice != font.DefaultName {
 		t.Errorf("expected fontChoice to fall back to %q, got %q", font.DefaultName, fontChoice)
@@ -52,7 +53,8 @@ func TestSeedFormStateTolerance(t *testing.T) {
 		Color: &goodColorPreset,
 	}
 
-	fontChoice2, colorChoice2, customColor2, _, _, _ := seedFormState(cfg2)
+	state2 := seedFormState(cfg2)
+	fontChoice2, colorChoice2, customColor2 := state2.fontChoice, state2.colorChoice, state2.customColor
 	if fontChoice2 != goodFont {
 		t.Errorf("expected fontChoice to be %q, got %q", goodFont, fontChoice2)
 	}
@@ -69,7 +71,8 @@ func TestSeedFormStateTolerance(t *testing.T) {
 		Color: &goodCustomColor,
 	}
 
-	_, colorChoice3, customColor3, _, _, _ := seedFormState(cfg3)
+	state3 := seedFormState(cfg3)
+	colorChoice3, customColor3 := state3.colorChoice, state3.customColor
 	if colorChoice3 != colorCustomChoice {
 		t.Errorf("expected colorChoice to be %q, got %q", colorCustomChoice, colorChoice3)
 	}
