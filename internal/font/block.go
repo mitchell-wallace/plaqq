@@ -554,4 +554,4 @@ var blockGlyphs = map[rune][]string{
 	},
 }
 
-func init() { register(DefaultName, NewBlock(blockGlyphs)) }
+func init() { register("block", NewBlock(blockGlyphs)) }

@@ -4,7 +4,7 @@ import "testing"
 
 func TestNamesIncludeExpected(t *testing.T) {
 	got := Names()
-	want := []string{"block", "heavy", "compact", "wide"}
+	want := []string{"compact", "block", "heavy", "wide"}
 	if len(got) != len(want) {
 		t.Fatalf("Names() = %v; want exactly %v", got, want)
 	}
@@ -69,7 +69,7 @@ func TestBlockRowWidths(t *testing.T) {
 
 func TestWrap(t *testing.T) {
 	f := Get("block")
-	
+
 	// Test case 1: normal sentence that fits
 	got := Wrap(f, "HELLO WORLD", 200)
 	want := []string{"HELLO WORLD"}

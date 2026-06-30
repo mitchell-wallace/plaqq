@@ -31,15 +31,15 @@ const Template = `# plaqq configuration
 # a hex code (e.g. "#00f5d4"), or an ANSI index ("0"-"255"). Defaults to info.
 # color = "info"
 
-# Font used to render the notice. Block fonts: "block" (default), "heavy",
-# "compact", "wide".
-# font = "block"
+# Font used to render the notice. Block fonts: "compact" (default), "block",
+# "heavy", "wide".
+# font = "compact"
 
 # Render the notice text in bold.
 # bold = true
 
-# Dismiss-hint text shown beneath the notice.
-# hint = "[ Press Space to dismiss ]"
+# Action hint text shown beneath the notice.
+# hint = "[ Space: dismiss | Enter: edit ]"
 
 # Hide the dismiss hint entirely.
 # no_hint = false

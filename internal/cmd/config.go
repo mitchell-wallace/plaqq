@@ -60,7 +60,10 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 
 			// If flags are set, save directly without picker
 			if cmd.Flags().Changed("color") || cmd.Flags().Changed("font") {
-				var sessState session.State
+				sessState, err := session.Load(styleWarningOutput)
+				if err != nil {
+					return err
+				}
 				if cmd.Flags().Changed("color") {
 					colorVal := strings.TrimSpace(flagConfigColor)
 					if colorVal != "" {
@@ -89,6 +92,7 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 						"path":  session.Current().Path(),
 						"color": sessState.Color,
 						"font":  sessState.Font,
+						"text":  sessState.Text,
 					})
 					return nil
 				}
@@ -103,6 +107,7 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 				var b strings.Builder
 				fmt.Fprintf(&b, "  color    %s\n", str(sessState.Color, "info"))
 				fmt.Fprintf(&b, "  font     %s\n", str(sessState.Font, font.DefaultName))
+				fmt.Fprintf(&b, "  text     %s\n", str(sessState.Text, "none"))
 				fmt.Print(b.String())
 				return nil
 			}
@@ -115,6 +120,9 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 				}
 				if sessState.Font != "" {
 					m["font"] = sessState.Font
+				}
+				if sessState.Text != "" {
+					m["text"] = sessState.Text
 				}
 				printJSON(m)
 				return nil
@@ -212,7 +220,7 @@ type formState struct {
 }
 
 // seedFormState determines the initial values for the interactive picker,
-// defaulting any invalid or unknown values to the built-in defaults (block / info).
+// defaulting any invalid or unknown values to the built-in defaults (compact / info).
 func seedFormState(cfg *config.Config) formState {
 	state := formState{
 		fontChoice:  font.DefaultName,
@@ -339,10 +347,12 @@ func runConfigPicker(path string, cfg *config.Config) error {
 	out := buildSavedConfig(fontChoice, colorChoice, customColor, bold, showHint, hintText)
 
 	if flagSession {
-		state := session.State{
-			Color: "",
-			Font:  "",
+		state, err := session.Load(styleWarningOutput)
+		if err != nil {
+			return err
 		}
+		state.Color = ""
+		state.Font = ""
 		if out.Color != nil {
 			state.Color = *out.Color
 		}
@@ -362,6 +372,7 @@ func runConfigPicker(path string, cfg *config.Config) error {
 		var b strings.Builder
 		fmt.Fprintf(&b, "  color    %s\n", str(state.Color, "info"))
 		fmt.Fprintf(&b, "  font     %s\n", str(state.Font, font.DefaultName))
+		fmt.Fprintf(&b, "  text     %s\n", str(state.Text, "none"))
 		fmt.Print(b.String())
 		return nil
 	}

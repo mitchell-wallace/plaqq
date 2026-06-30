@@ -15,8 +15,8 @@ type Font interface {
 	Width(s string) int
 }
 
-// DefaultName is the registry key for the built-in chunky block font.
-const DefaultName = "block"
+// DefaultName is the registry key for the default font.
+const DefaultName = "compact"
 
 // Charset is the curated uppercase glyph coverage shared by the gallery and the
 // font tests: A-Z, 0-9, ! ? . , : ; ' - / & % ( ) plus space.
@@ -51,7 +51,7 @@ func Has(name string) bool {
 // Names returns font names in their curated display order, with any unexpected
 // extras sorted after the built-ins.
 func Names() []string {
-	preferred := []string{DefaultName, "heavy", "compact", "wide"}
+	preferred := []string{DefaultName, "block", "heavy", "wide"}
 	names := make([]string, 0, len(registry))
 	seen := make(map[string]struct{}, len(preferred))
 	for _, name := range preferred {

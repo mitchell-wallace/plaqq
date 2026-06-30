@@ -22,7 +22,7 @@ import (
 	"golang.org/x/term"
 )
 
-const defaultHint = "[ Press Space to dismiss ]"
+const defaultHint = "[ Space: dismiss | Enter: edit ]"
 
 const (
 	envColor  = "PLAQQ_COLOR"
@@ -30,6 +30,7 @@ const (
 	envBold   = "PLAQQ_BOLD"
 	envHint   = "PLAQQ_HINT"
 	envNoHint = "PLAQQ_NO_HINT"
+	envText   = "PLAQQ_TEXT"
 )
 
 var (
@@ -38,11 +39,12 @@ var (
 	styleWarningOutput io.Writer = os.Stderr
 
 	// Styling flags for the notice display.
-	flagColor  string
-	flagFont   string
-	flagBold   bool
-	flagHint   string
-	flagNoHint bool
+	flagColor    string
+	flagFont     string
+	flagBold     bool
+	flagHint     string
+	flagNoHint   bool
+	flagContinue bool
 )
 
 func init() {
@@ -50,8 +52,9 @@ func init() {
 	rootCmd.Flags().StringVar(&flagColor, "color", "", "notice color: a preset name ("+strings.Join(presetOrder, ", ")+"), a hex code (e.g. #00f5d4), or an ANSI index (0-255); defaults to info")
 	rootCmd.Flags().StringVar(&flagFont, "font", "", "font to render the notice in; one of: "+strings.Join(font.Names(), ", "))
 	rootCmd.Flags().BoolVar(&flagBold, "bold", true, "render the notice text in bold")
-	rootCmd.Flags().StringVar(&flagHint, "hint", defaultHint, "dismiss-hint text shown beneath the notice")
+	rootCmd.Flags().StringVar(&flagHint, "hint", defaultHint, "action-hint text shown beneath the notice")
 	rootCmd.Flags().BoolVar(&flagNoHint, "no-hint", false, "hide the dismiss hint")
+	rootCmd.Flags().BoolVarP(&flagContinue, "continue", "c", false, "open the last notice from this terminal session")
 }
 
 // parseColor validates a user-supplied color string and returns the matching
@@ -477,8 +480,8 @@ type interactiveFormResult struct {
 // the user can shift+tab back to edit the message. Esc and Ctrl-C abort at any
 // step (returned as huh.ErrUserAborted). Each select is seeded from the
 // fully-resolved style.
-func runInteractiveForm(style styleSettings) (interactiveFormResult, error) {
-	var message string
+func runInteractiveForm(style styleSettings, initialMessage string) (interactiveFormResult, error) {
+	message := strings.TrimSpace(initialMessage)
 	action := actionConfirm
 	fontChoice := seedCustomiseFont(style.font)
 	colorOpts, colorChoice := customiseColorOptions(style.color)
@@ -536,7 +539,8 @@ var rootCmd = &cobra.Command{
 	Use:   "plaqq [message]",
 	Short: "plaqq displays a notice across the terminal pane in chunky letters",
 	Long: `plaqq takes a message and displays it in a large chunky font centered on the
-terminal. It waits for the user to press the spacebar to dismiss the notice.
+terminal. Space dismisses the notice; Enter returns to the prompt so the message,
+font, or color can be edited and shown again.
 
 The font, color, bold weight, and dismiss hint can be customized with the
 --font, --color, --bold, --hint, and --no-hint flags, or set as persistent
@@ -549,7 +553,8 @@ block faces (block, heavy, compact, wide).`,
   plaqq --font heavy --color "#ff5f87" "build failed"
   plaqq --font compact --bold=false "heads up"
   plaqq --hint "press space to continue" "meeting in 5"
-  plaqq --no-hint "stand clear"`,
+  plaqq --no-hint "stand clear"
+  plaqq --continue`,
 	Args:          cobra.MaximumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -561,6 +566,11 @@ block faces (block, heavy, compact, wide).`,
 			return err
 		}
 
+		state, err := session.Load(styleWarningOutput)
+		if err != nil {
+			warnStyleValue(styleValueError(sessionStyleSource("record"), "%v", err))
+		}
+
 		// Render font/colour start from the resolved style and may be overridden
 		// by the customise step below.
 		renderFont := style.font
@@ -570,6 +580,14 @@ block faces (block, heavy, compact, wide).`,
 		if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
 			// Message-argument path: render immediately, no confirm/customise step.
 			noticeMsg = args[0]
+		} else if flagContinue {
+			noticeMsg = strings.TrimSpace(os.Getenv(envText))
+			if noticeMsg == "" {
+				noticeMsg = state.Text
+			}
+			if noticeMsg == "" {
+				exit(1, "no previous message for this terminal session")
+			}
 		} else {
 			// The confirm/customise form needs an interactive TTY. When stdin is
 			// piped/CI or --json-output is set, refuse to launch it and ask for a
@@ -578,7 +596,7 @@ block faces (block, heavy, compact, wide).`,
 			if !interactiveFormAllowed(term.IsTerminal(int(os.Stdin.Fd())), jsonOutput) {
 				exit(1, "a message is required")
 			}
-			res, err := runInteractiveForm(style)
+			res, err := runInteractiveForm(style, "")
 			if err != nil {
 				if errors.Is(err, huh.ErrUserAborted) {
 					// Esc/Ctrl-C at any step: clean exit, no notice.
@@ -590,83 +608,126 @@ block faces (block, heavy, compact, wide).`,
 			if res.customised {
 				renderFont = res.fontChoice
 				renderColor = res.colorChoice
-				// Customise sticks for the session: write the chosen font and
-				// colour so the next plaqq in this pane reuses them. A write
-				// failure is non-fatal — warn and still render this notice.
-				if err := session.Save(session.State{Font: res.fontChoice, Color: res.colorChoice}); err != nil {
-					warnStyleValue(fmt.Errorf("could not save session state: %w", err))
-				}
 			}
 		}
 
-		glyphFont := font.Get(renderFont)
+		for {
+			if err := saveSessionState(session.State{Font: renderFont, Color: renderColor, Text: noticeMsg}); err != nil {
+				warnStyleValue(fmt.Errorf("could not save session state: %w", err))
+			}
 
-		var noticeColor lipgloss.TerminalColor = lipgloss.AdaptiveColor{Light: "#00d7af", Dark: "#00f5d4"}
-		if renderColor != "" {
-			c, err := parseColor(renderColor)
+			glyphFont := font.Get(renderFont)
+
+			var noticeColor lipgloss.TerminalColor = lipgloss.AdaptiveColor{Light: "#00d7af", Dark: "#00f5d4"}
+			if renderColor != "" {
+				c, err := parseColor(renderColor)
+				if err != nil {
+					return err
+				}
+				noticeColor = c
+			}
+
+			updateNoticeChan := make(chan string, 1)
+			startUpdateCheck(updateNoticeChan)
+
+			m := initialModel(noticeMsg, glyphFont, noticeColor, style.bold, style.hint, !style.noHint)
+			p := tea.NewProgram(&m, tea.WithAltScreen(), tea.WithoutCatchPanics())
+			finalModel, err := p.Run()
 			if err != nil {
+				return fmt.Errorf("run program: %w", err)
+			}
+
+			fmt.Printf("message: %q\n", noticeMsg)
+
+			select {
+			case notice := <-updateNoticeChan:
+				fmt.Fprintln(os.Stderr, notice)
+			default:
+			}
+
+			if final, ok := finalModel.(*model); !ok || final.action != modelActionEdit {
+				return nil
+			}
+
+			if !interactiveFormAllowed(term.IsTerminal(int(os.Stdin.Fd())), jsonOutput) {
+				exit(1, "cannot edit without an interactive terminal")
+			}
+			res, err := runInteractiveForm(styleSettings{color: renderColor, font: renderFont, bold: style.bold, hint: style.hint, noHint: style.noHint}, noticeMsg)
+			if err != nil {
+				if errors.Is(err, huh.ErrUserAborted) {
+					return nil
+				}
 				return err
 			}
-			noticeColor = c
+			noticeMsg = res.message
+			if res.customised {
+				renderFont = res.fontChoice
+				renderColor = res.colorChoice
+			}
 		}
-
-		// Start update check in background
-		updateNoticeChan := make(chan string, 1)
-		if !jsonOutput && isReleaseVersion(version) {
-			go func() {
-				client := &http.Client{Timeout: 2 * time.Second}
-				req, err := http.NewRequest("GET", "https://api.github.com/repos/mitchell-wallace/plaqq/releases/latest", nil)
-				if err != nil {
-					return
-				}
-				req.Header.Set("Accept", "application/vnd.github+json")
-				if token := os.Getenv("GITHUB_TOKEN"); token != "" {
-					req.Header.Set("Authorization", "Bearer "+token)
-				} else if token := os.Getenv("GH_TOKEN"); token != "" {
-					req.Header.Set("Authorization", "Bearer "+token)
-				}
-				resp, err := client.Do(req)
-				if err != nil {
-					return
-				}
-				defer func() { _ = resp.Body.Close() }()
-				if resp.StatusCode != http.StatusOK {
-					return
-				}
-				var payload struct {
-					TagName string `json:"tag_name"`
-				}
-				if err := json.NewDecoder(resp.Body).Decode(&payload); err == nil {
-					latest := strings.TrimPrefix(payload.TagName, "v")
-					cmp, err := compareVersions(version, latest)
-					if err == nil && cmp < 0 {
-						updateNoticeChan <- fmt.Sprintf("\n✨ A new version of plaqq is available: v%s (current: v%s). Run 'plaqq update' to update.", latest, version)
-					}
-				}
-			}()
-		}
-
-		// Initialize Bubble Tea program
-		m := initialModel(noticeMsg, glyphFont, noticeColor, style.bold, style.hint, !style.noHint)
-		p := tea.NewProgram(&m, tea.WithAltScreen(), tea.WithoutCatchPanics())
-		if _, err := p.Run(); err != nil {
-			return fmt.Errorf("run program: %w", err)
-		}
-
-		// Echo the message to scrollback so it survives after the alt-screen
-		// is torn down (otherwise an interactively entered notice leaves no trace).
-		fmt.Printf("message: %q\n", noticeMsg)
-
-		// Print update notice if one was detected
-		select {
-		case notice := <-updateNoticeChan:
-			fmt.Fprintln(os.Stderr, notice)
-		default:
-		}
-
-		return nil
 	},
 }
+
+func startUpdateCheck(updateNoticeChan chan<- string) {
+	if jsonOutput || !isReleaseVersion(version) {
+		return
+	}
+	go func() {
+		client := &http.Client{Timeout: 2 * time.Second}
+		req, err := http.NewRequest("GET", "https://api.github.com/repos/mitchell-wallace/plaqq/releases/latest", nil)
+		if err != nil {
+			return
+		}
+		req.Header.Set("Accept", "application/vnd.github+json")
+		if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		} else if token := os.Getenv("GH_TOKEN"); token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode != http.StatusOK {
+			return
+		}
+		var payload struct {
+			TagName string `json:"tag_name"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&payload); err == nil {
+			latest := strings.TrimPrefix(payload.TagName, "v")
+			cmp, err := compareVersions(version, latest)
+			if err == nil && cmp < 0 {
+				updateNoticeChan <- fmt.Sprintf("\n✨ A new version of plaqq is available: v%s (current: v%s). Run 'plaqq update' to update.", latest, version)
+			}
+		}
+	}()
+}
+
+func saveSessionState(next session.State) error {
+	current, err := session.Load(styleWarningOutput)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(next.Color) == "" {
+		next.Color = current.Color
+	}
+	if strings.TrimSpace(next.Font) == "" {
+		next.Font = current.Font
+	}
+	if strings.TrimSpace(next.Text) == "" {
+		next.Text = current.Text
+	}
+	return session.Save(next)
+}
+
+type modelAction int
+
+const (
+	modelActionDismiss modelAction = iota
+	modelActionEdit
+)
 
 type model struct {
 	text         string
@@ -678,6 +739,7 @@ type model struct {
 	bold         bool
 	showHint     bool
 	scrollOffset int
+	action       modelAction
 }
 
 func initialModel(text string, glyphFont font.Font, color lipgloss.TerminalColor, bold bool, hint string, showHint bool) model {
@@ -802,7 +864,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case " ", "enter", "esc", "ctrl+c", "q":
+		case "enter":
+			m.action = modelActionEdit
+			return m, tea.Quit
+		case " ", "esc", "ctrl+c", "q":
+			m.action = modelActionDismiss
 			return m, tea.Quit
 		case "up", "k":
 			if m.scrollOffset > 0 {

@@ -11,7 +11,7 @@ import (
 
 func TestSaveThenLoadRoundTrips(t *testing.T) {
 	store := NewStore(t.TempDir(), 1001)
-	in := State{Color: "alert", Font: "heavy"}
+	in := State{Color: "alert", Font: "heavy", Text: "deploy starting"}
 
 	if err := store.Save(in); err != nil {
 		t.Fatalf("Save: %v", err)
@@ -53,7 +53,7 @@ func TestSaveReplacesExistingFileAtomicallyWithPrivateMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := store.Save(State{Color: "ok", Font: "compact"}); err != nil {
+	if err := store.Save(State{Color: "ok", Font: "compact", Text: "new text"}); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 
@@ -62,7 +62,7 @@ func TestSaveReplacesExistingFileAtomicallyWithPrivateMode(t *testing.T) {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	text := string(got)
-	if strings.Contains(text, "block") || !strings.Contains(text, `font = "compact"`) {
+	if strings.Contains(text, "block") || !strings.Contains(text, `font = "compact"`) || !strings.Contains(text, `text = "new text"`) {
 		t.Fatalf("state file content = %q; want replacement with compact only", text)
 	}
 

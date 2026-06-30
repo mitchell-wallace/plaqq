@@ -147,6 +147,9 @@ func TestConfigSessionSet(t *testing.T) {
 	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "config.toml"))
 	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
 	resetConfigFlags()
+	if err := session.Save(session.State{Text: "last deploy"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
 
 	rootCmd.SetArgs([]string{"config", "--session", "--color", "alert", "--font", "heavy"})
 	if err := rootCmd.Execute(); err != nil {
@@ -162,6 +165,9 @@ func TestConfigSessionSet(t *testing.T) {
 	}
 	if state.Font != "heavy" {
 		t.Errorf("expected session font 'heavy', got %q", state.Font)
+	}
+	if state.Text != "last deploy" {
+		t.Errorf("expected session text to be preserved, got %q", state.Text)
 	}
 }
 

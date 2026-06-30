@@ -31,7 +31,7 @@ To release a new version of `plaqq`:
 
 ## 🎨 Layout & Font Architecture
 
-- **Font Registry**: Fonts implement the `font.Font` interface (`Render(line) []string`, `Width(s) int`) and register themselves under a name. `font.Get(name)` resolves a font (falling back to `block`); `font.Names()` lists them with the default first. New fonts are added as a `map[rune][]string` wrapped in `NewBlock`.
+- **Font Registry**: Fonts implement the `font.Font` interface (`Render(line) []string`, `Width(s) int`) and register themselves under a name. `font.Get(name)` resolves a font (falling back to `compact`); `font.Names()` lists them with the default first. New fonts are added as a `map[rune][]string` wrapped in `NewBlock`.
 - **Zero Runtime Dependencies**: The `go-figure` dependency and FIGlet ASCII faces are removed. Fonts are defined entirely by static, committed Unicode block glyph maps (`block`, `heavy`, `compact`, `wide`) packaged inside the binary. Block fonts upper-case input; each block glyph's rows must share one width (enforced by `TestBlockRowWidths`).
 - **Word Wrapping**: `font.Wrap(f, text, maxWidth)` greedily packs whole words using the font's own `Width`. Max columns = terminal width − 8.
 - **Centering**: Each wrapped line is rendered as a block and centered with one uniform pad so that column alignments stay correct (see `model.View`).
@@ -40,4 +40,3 @@ To release a new version of `plaqq`:
 - **Style Resolution & Precedence**: `resolveStyle` in `internal/cmd/root.go` layers styles from multiple sources with precedence: built-in defaults < config file < session env vars (`PLAQQ_COLOR`, `PLAQQ_FONT`, `PLAQQ_BOLD`, `PLAQQ_HINT`, `PLAQQ_NO_HINT`) < session state < CLI flags. Flags/config invalid values error immediately, while env/session invalids log warning to stderr and fall through.
 - **Session-State Store**: Managed by `internal/session`, keyed by parent shell PID (`os.Getppid()`). Written by the customise flow and `plaqq config --session`, cleared via `plaqq config --session --clear`. Stores temporary state as TOML under `$XDG_RUNTIME_DIR/plaqq/` (or fallback temp dir) with file mode `0600`.
 - **Key Bindings**: Pressing the `Spacebar`, `Enter`, `Esc`, `q`, or `Ctrl+C` immediately quits the application, returning you back to the main terminal screen.
-

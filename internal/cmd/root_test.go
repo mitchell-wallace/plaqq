@@ -20,13 +20,14 @@ import (
 // package-level vars resolveStyle reads, so flag.Set both records the value and
 // marks the flag as Changed (mirroring real CLI parsing).
 func newStyleFlagCmd() *cobra.Command {
-	flagColor, flagFont, flagBold, flagHint, flagNoHint = "", "", true, defaultHint, false
+	flagColor, flagFont, flagBold, flagHint, flagNoHint, flagContinue = "", "", true, defaultHint, false, false
 	c := &cobra.Command{Use: "test"}
 	c.Flags().StringVar(&flagColor, "color", "", "")
 	c.Flags().StringVar(&flagFont, "font", "", "")
 	c.Flags().BoolVar(&flagBold, "bold", true, "")
 	c.Flags().StringVar(&flagHint, "hint", defaultHint, "")
 	c.Flags().BoolVar(&flagNoHint, "no-hint", false, "")
+	c.Flags().BoolVarP(&flagContinue, "continue", "c", false, "")
 	return c
 }
 
@@ -34,7 +35,7 @@ func isolateStyleResolution(t *testing.T, configPath string) {
 	t.Helper()
 	t.Setenv("PLAQQ_CONFIG", configPath)
 	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
-	for _, name := range []string{envColor, envFont, envBold, envHint, envNoHint} {
+	for _, name := range []string{envColor, envFont, envBold, envHint, envNoHint, envText} {
 		t.Setenv(name, "")
 	}
 }
@@ -390,6 +391,29 @@ func TestSeedCustomiseFont(t *testing.T) {
 	}
 }
 
+func TestModelEnterEditsSpaceDismisses(t *testing.T) {
+	f := font.Get("block")
+	color, _ := parseColor("info")
+	m := initialModel("hello", f, color, true, defaultHint, true)
+
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("enter should quit the TUI")
+	}
+	if got := updatedModel.(*model).action; got != modelActionEdit {
+		t.Fatalf("enter action = %v; want edit", got)
+	}
+
+	m = initialModel("hello", f, color, true, defaultHint, true)
+	updatedModel, cmd = m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	if cmd == nil {
+		t.Fatal("space should quit the TUI")
+	}
+	if got := updatedModel.(*model).action; got != modelActionDismiss {
+		t.Fatalf("space action = %v; want dismiss", got)
+	}
+}
+
 func TestCustomiseColorOptions(t *testing.T) {
 	// Empty resolved -> seeds to info, presets only, no extra option.
 	opts, choice := customiseColorOptions("")
@@ -615,4 +639,3 @@ func TestTUIScrolling(t *testing.T) {
 		t.Errorf("expected view to render scrollbar characters ('░' or '█') in scrollable state")
 	}
 }
-
