@@ -414,6 +414,14 @@ func TestModelEnterEditsSpaceDismisses(t *testing.T) {
 	}
 }
 
+func TestDismissedNoticeOutputIncludesReplayHint(t *testing.T) {
+	got := dismissedNoticeOutput("deploy starting")
+	want := "message: \"deploy starting\"\nRun `plaqq -c` to show again.\n"
+	if got != want {
+		t.Fatalf("dismissedNoticeOutput = %q; want %q", got, want)
+	}
+}
+
 func TestSaveSessionTextOnlyDoesNotPersistRenderStyle(t *testing.T) {
 	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
 	warnings := captureStyleWarnings(t)

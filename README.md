@@ -198,6 +198,7 @@ If `plaqq` is run without a message argument in a non-interactive terminal (e.g.
 
 ```
 message: "remember to run e2e tests before pushing"
+Run `plaqq -c` to show again.
 ```
 
 ### Options & Subcommands
@@ -206,7 +207,7 @@ message: "remember to run e2e tests before pushing"
     ```bash
     plaqq version
     ```
-*   **`update`**: Checks the GitHub releases page for a newer version and updates in-place.
+*   **`update`**: Checks the GitHub releases page for a newer version and updates in-place without prompting.
     ```bash
     plaqq update
     ```

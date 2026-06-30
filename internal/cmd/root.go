@@ -23,6 +23,7 @@ import (
 )
 
 const defaultHint = "[ Space: dismiss | Enter: edit ]"
+const replayHint = "Run `plaqq -c` to show again."
 
 const (
 	envColor  = "PLAQQ_COLOR"
@@ -651,7 +652,7 @@ block faces (block, heavy, compact, wide).`,
 			}
 
 			if final, ok := finalModel.(*model); !ok || final.action != modelActionEdit {
-				fmt.Printf("message: %q\n", noticeMsg)
+				fmt.Print(dismissedNoticeOutput(noticeMsg))
 				return nil
 			}
 
@@ -710,6 +711,10 @@ func startUpdateCheck(updateNoticeChan chan<- string) {
 			}
 		}
 	}()
+}
+
+func dismissedNoticeOutput(message string) string {
+	return fmt.Sprintf("message: %q\n%s\n", message, replayHint)
 }
 
 func saveSessionState(next session.State) error {

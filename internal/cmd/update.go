@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -25,11 +24,11 @@ var (
 
 var updateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Check for a newer version and optionally update",
+	Short: "Check for a newer version and update",
 	Long: `Check the GitHub releases page for a newer version of plaqq.
 
 Prints the current and latest versions. If a newer version is available,
-prompts for confirmation before running the install script unless --yes is set.`,
+runs the install script immediately.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		latest, err := fetchLatestVersionFunc()
 		if err != nil {
@@ -67,36 +66,11 @@ prompts for confirmation before running the install script unless --yes is set.`
 			}
 		}
 
-		if !updateYes {
-			if jsonOutput {
-				printJSON(map[string]any{
-					"currentVersion": current,
-					"latestVersion":  latest,
-					"devBuild":       dev,
-					"upToDate":       false,
-					"updated":        false,
-				})
-				return
-			}
+		if !jsonOutput {
 			fmt.Printf("Current version: %s\nLatest version:  %s\n", current, latest)
-			prompt := "Update to latest version? [Y/n] "
 			if dev {
 				fmt.Println("You are running a development build.")
-				prompt = "Install the latest release? [Y/n] "
 			}
-			fmt.Print(prompt)
-			reader := bufio.NewReader(os.Stdin)
-			response, err := reader.ReadString('\n')
-			if err != nil {
-				exit(2, "update: read confirmation: %v", err)
-			}
-			response = strings.TrimSpace(strings.ToLower(response))
-			if response != "" && response != "y" && response != "yes" {
-				fmt.Println("Update cancelled.")
-				return
-			}
-		} else if !jsonOutput {
-			fmt.Printf("Current version: %s\nLatest version:  %s\n", current, latest)
 		}
 
 		if err := installLatestVersionFn(); err != nil {
@@ -115,7 +89,7 @@ prompts for confirmation before running the install script unless --yes is set.`
 }
 
 func init() {
-	updateCmd.Flags().BoolVarP(&updateYes, "yes", "y", false, "install without prompting when an update is available")
+	updateCmd.Flags().BoolVarP(&updateYes, "yes", "y", false, "accepted for compatibility; update no longer prompts")
 	rootCmd.AddCommand(updateCmd)
 }
 

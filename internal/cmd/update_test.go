@@ -56,8 +56,7 @@ func TestCompareVersions(t *testing.T) {
 
 // TestUpdateDevBuildInstalls verifies that running `update` from a development
 // build (e.g. a bare git hash) no longer fails on version comparison, and
-// instead offers to install the latest release. With --yes it installs without
-// prompting.
+// installs the latest release without prompting.
 func TestUpdateDevBuildInstalls(t *testing.T) {
 	origFetch, origInstall, origYes, origVersion := fetchLatestVersionFunc, installLatestVersionFn, updateYes, version
 	t.Cleanup(func() {
@@ -67,12 +66,31 @@ func TestUpdateDevBuildInstalls(t *testing.T) {
 	fetchLatestVersionFunc = func() (string, error) { return "0.3.0", nil }
 	installed := false
 	installLatestVersionFn = func() error { installed = true; return nil }
-	updateYes = true
+	updateYes = false
 	version = "1a06be9" // bare build hash that previously crashed compareVersions
 
 	updateCmd.Run(updateCmd, nil)
 
 	if !installed {
 		t.Error("expected dev build update to install the latest release")
+	}
+}
+
+func TestUpdateReleaseInstallsWithoutConfirmation(t *testing.T) {
+	origFetch, origInstall, origYes, origVersion := fetchLatestVersionFunc, installLatestVersionFn, updateYes, version
+	t.Cleanup(func() {
+		fetchLatestVersionFunc, installLatestVersionFn, updateYes, version = origFetch, origInstall, origYes, origVersion
+	})
+
+	fetchLatestVersionFunc = func() (string, error) { return "0.6.1", nil }
+	installed := false
+	installLatestVersionFn = func() error { installed = true; return nil }
+	updateYes = false
+	version = "0.6.0"
+
+	updateCmd.Run(updateCmd, nil)
+
+	if !installed {
+		t.Error("expected newer release update to install without confirmation")
 	}
 }
