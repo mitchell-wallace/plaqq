@@ -414,6 +414,66 @@ func TestModelEnterEditsSpaceDismisses(t *testing.T) {
 	}
 }
 
+func TestSaveSessionTextOnlyDoesNotPersistRenderStyle(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	warnings := captureStyleWarnings(t)
+
+	if err := saveSessionState(session.State{Text: "deploy starting"}); err != nil {
+		t.Fatalf("saveSessionState text only: %v", err)
+	}
+	state, err := session.Load(nil)
+	if err != nil {
+		t.Fatalf("session Load: %v", err)
+	}
+	if state.Text != "deploy starting" {
+		t.Fatalf("text = %q; want deploy starting", state.Text)
+	}
+	if state.Font != "" || state.Color != "" {
+		t.Fatalf("text-only save persisted style: %+v", state)
+	}
+	if warnings.Len() != 0 {
+		t.Fatalf("unexpected warnings: %s", warnings.String())
+	}
+}
+
+func TestSaveSessionStatePreservesExistingStyleWhenSavingText(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	if err := session.Save(session.State{Font: "heavy", Color: "alert"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+
+	if err := saveSessionState(session.State{Text: "new text"}); err != nil {
+		t.Fatalf("saveSessionState text only: %v", err)
+	}
+	state, err := session.Load(nil)
+	if err != nil {
+		t.Fatalf("session Load: %v", err)
+	}
+	want := session.State{Font: "heavy", Color: "alert", Text: "new text"}
+	if state != want {
+		t.Fatalf("state = %+v; want %+v", state, want)
+	}
+}
+
+func TestSaveSessionStateDropsInvalidExistingStyleWhenSavingText(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	if err := session.Save(session.State{Font: "slant", Color: "not-a-color"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+
+	if err := saveSessionState(session.State{Text: "new text"}); err != nil {
+		t.Fatalf("saveSessionState text only: %v", err)
+	}
+	state, err := session.Load(nil)
+	if err != nil {
+		t.Fatalf("session Load: %v", err)
+	}
+	want := session.State{Text: "new text"}
+	if state != want {
+		t.Fatalf("state = %+v; want %+v", state, want)
+	}
+}
+
 func TestCustomiseColorOptions(t *testing.T) {
 	// Empty resolved -> seeds to info, presets only, no extra option.
 	opts, choice := customiseColorOptions("")

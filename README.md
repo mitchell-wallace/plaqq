@@ -2,19 +2,20 @@
 
 `plaqq` is a lightweight Go CLI tool for displaying stylized notices in terminal panes.
 
-It takes any custom notice text, renders it in a centered, chunky Unicode block font using adaptive terminal styling, and prompts the user to dismiss it with a single keystroke.
+It takes any custom notice text, renders it in a centered, chunky Unicode block font using adaptive terminal styling, and lets the user dismiss or edit it with a single keystroke.
 
 ---
 
 ## Features
 
-- **Four Fonts**: Ships four Unicode block faces: `block` (clean medium, default), `heavy` (solid filled block), `compact` (dense 3-row half-block for tight spaces), and `wide` (a roomier, more open medium-weight face).
+- **Four Fonts**: Ships four Unicode block faces: `compact` (dense 3-row half-block, default), `block` (clean medium), `heavy` (solid filled block), and `wide` (a roomier, more open medium-weight face).
 - **Semantic Adaptive Palette**: Pick from five named semantic colors (`alert`, `warn`, `info` (default), `ok`, `focus`), each utilizing adaptive theme styling to look great on both light and dark terminal backgrounds.
 - **Escape Hatch**: Supply custom hex codes (e.g., `#00f5d4`) or ANSI color indexes (`0`-`255`) for personalized coloring.
 - **Strict Validation**: Invalid font or color preset names in CLI flags or config files trigger a non-zero exit status with a helpful suggestion message.
 - **Interactive Config Picker**: Run `plaqq config` (no subcommand) to edit your styling defaults in a friendly, interactive form (which tolerates invalid stored configurations for easy repair).
 - **Dynamic Centering & Word Wrapping**: Automatically wraps text to fit within your terminal pane margin and keeps the notice perfectly centered vertically and horizontally.
-- **Spacebar Dismissal**: Dismiss the overlay instantly by pressing `Space`.
+- **Fast Notice Actions**: Press `Space` to dismiss, or `Enter` to reopen the prompt and edit the message/font/color.
+- **Per-Pane Continue**: `plaqq --continue` or `plaqq -c` reopens the last notice text from the current terminal pane.
 - **Background Update Notification**: Automatically checks for newer versions and alerts you when updates are available.
 
 ---
@@ -52,7 +53,7 @@ plaqq "remember to run e2e tests before pushing"
 
 The notice appearance can be customized with flags (run `plaqq -h` to see them all):
 
-*   **`--font`**: Font used to render the notice. Supported block faces: `block` (default), `heavy`, `compact`, `wide`.
+*   **`--font`**: Font used to render the notice. Supported block faces: `compact` (default), `block`, `heavy`, `wide`.
     ```bash
     plaqq --font heavy "shipped"
     plaqq --font compact "heads up"
@@ -73,13 +74,18 @@ The notice appearance can be customized with flags (run `plaqq -h` to see them a
     ```bash
     plaqq --no-hint "stand clear"
     ```
+*   **`-c`, `--continue`**: Reopen the last notice text from this terminal pane using the current resolved style.
+    ```bash
+    plaqq --continue
+    plaqq -c
+    ```
 
 ### Strict Validation
 
 If you specify an unknown named font or color preset (either via CLI flags or in the TOML configuration file), `plaqq` exits with a non-zero status and prints a list of valid choices along with a nearest-match suggestion if one exists:
 
 ```
-plaqq: unknown font "heavyy" from --font flag: valid fonts are block, heavy, compact, wide; did you mean "heavy"?
+plaqq: unknown font "heavyy" from --font flag: valid fonts are compact, block, heavy, wide; did you mean "heavy"?
 ```
 
 **Exception**: The interactive config picker (`plaqq config`) is designed to tolerate invalid config files so that it remains usable as a repair path. It seeds invalid values with defaults, allowing you to select and save valid choices.
@@ -114,7 +120,7 @@ When determining the visual style (color, font, bold, hint, etc.) for a notice, 
 
 | Priority | Source | Scope | How to Configure / Set |
 | :--- | :--- | :--- | :--- |
-| **1 (Lowest)** | **Built-in Defaults** | Hardcoded | Fallback settings (e.g., `info` color, `block` font, bold enabled) |
+| **1 (Lowest)** | **Built-in Defaults** | Hardcoded | Fallback settings (e.g., `info` color, `compact` font, bold enabled) |
 | **2** | **Config File** | User-wide | TOML file (check path with `plaqq config path` or edit with `plaqq config`) |
 | **3** | **Session Environment Variables** | Current shell process | Ambient `PLAQQ_*` environment variables (e.g., `export PLAQQ_COLOR=warn`) |
 | **4** | **Session State** | Current terminal pane | Set interactively via the "Customise" flow or via `plaqq config --session` |
@@ -133,9 +139,10 @@ You can set ambient styles for your current shell pane using environment variabl
 | `PLAQQ_BOLD` | Bold | `true` or `false` |
 | `PLAQQ_HINT` | Hint text | String |
 | `PLAQQ_NO_HINT` | Hide hint | `true` or `false` |
+| `PLAQQ_TEXT` | `--continue` text override | String |
 
 > [!NOTE]
-> These style variables are unrelated to `PLAQQ_CONFIG`, which is used solely to override the path to the TOML configuration file.
+> These variables are unrelated to `PLAQQ_CONFIG`, which is used solely to override the path to the TOML configuration file. `PLAQQ_TEXT` is only read by `plaqq --continue`; it is useful for shell-managed pane text and takes precedence over the saved last notice text.
 
 #### Error Handling for Invalid Values
 
@@ -147,13 +154,13 @@ To avoid rendering failures in background/ambient scripts, environment variables
 
 Since children cannot alter their parent shell's environment variables, `plaqq` manages a temporary session-state store keyed by the parent shell's process ID (`os.Getppid()`). This allows styling choices to stick to a specific terminal pane/window.
 
-- **Storage**: Written as TOML to `$XDG_RUNTIME_DIR/plaqq/` (or fallback temp folder) with restricted permissions (`0600`). It is automatically cleaned up when the user logs out.
+- **Storage**: Written as TOML to `$XDG_RUNTIME_DIR/plaqq/` (or fallback temp folder) with restricted permissions (`0600`). It stores at most one last notice text plus optional session style and is automatically cleaned up when the user logs out.
 - **Precedence Caveat**: Session state sits **above** environment variables. If you customize the session or set session state, a later `export PLAQQ_COLOR=...` in the same terminal pane will be overridden by the session state. Run `plaqq config --session --clear` to clear the session state and allow environment variables to take effect again.
-- **Release Note**: These style-config ergonomics changes do not bump `VERSION`. Plaqq's auto-tagged releases only cut when the `VERSION` file changes.
 
 #### Per-Pane Recipes
 
 - **Interactively Customise**: Run bare `plaqq` with no arguments, fill in the message, and select **Customise**. Your choices will be saved to the session state for subsequent invocations in this pane.
+- **Continue Last Notice**: Use `plaqq --continue` or `plaqq -c` to reopen the last notice text from this pane. `PLAQQ_TEXT` can override that saved text for shell-managed workflows.
 - **Manually Save Session Style**: Use the `--session` flag with `--color` or `--font` to save styling to the current terminal pane:
   ```bash
   plaqq config --session --color alert --font heavy
@@ -187,7 +194,7 @@ If `plaqq` is run without a message argument in a non-interactive terminal (e.g.
 
 ### Message History
 
-`plaqq` displays the notice on the alternate screen, which is torn down on dismissal. To keep a record in your scrollback, the notice text is echoed to stdout after closing:
+`plaqq` displays the notice on the alternate screen, which is torn down on dismissal. To keep a record in your scrollback, the notice text is echoed to stdout after final dismissal:
 
 ```
 message: "remember to run e2e tests before pushing"
@@ -213,5 +220,6 @@ message: "remember to run e2e tests before pushing"
 ## Key Bindings (Notice Screen)
 
 While the notice is active:
-*   `Space` or `Enter`: Dismiss the notice.
+*   `Space`: Dismiss the notice.
+*   `Enter`: Return to the prompt to edit the message/font/color.
 *   `Esc`, `q` or `Ctrl+C`: Exit and return to the prompt.

@@ -575,6 +575,7 @@ block faces (block, heavy, compact, wide).`,
 		// by the customise step below.
 		renderFont := style.font
 		renderColor := style.color
+		persistStyle := false
 
 		var noticeMsg string
 		if len(args) > 0 && strings.TrimSpace(args[0]) != "" {
@@ -608,11 +609,17 @@ block faces (block, heavy, compact, wide).`,
 			if res.customised {
 				renderFont = res.fontChoice
 				renderColor = res.colorChoice
+				persistStyle = true
 			}
 		}
 
 		for {
-			if err := saveSessionState(session.State{Font: renderFont, Color: renderColor, Text: noticeMsg}); err != nil {
+			nextState := session.State{Text: noticeMsg}
+			if persistStyle {
+				nextState.Font = renderFont
+				nextState.Color = renderColor
+			}
+			if err := saveSessionState(nextState); err != nil {
 				warnStyleValue(fmt.Errorf("could not save session state: %w", err))
 			}
 
@@ -637,8 +644,6 @@ block faces (block, heavy, compact, wide).`,
 				return fmt.Errorf("run program: %w", err)
 			}
 
-			fmt.Printf("message: %q\n", noticeMsg)
-
 			select {
 			case notice := <-updateNoticeChan:
 				fmt.Fprintln(os.Stderr, notice)
@@ -646,6 +651,7 @@ block faces (block, heavy, compact, wide).`,
 			}
 
 			if final, ok := finalModel.(*model); !ok || final.action != modelActionEdit {
+				fmt.Printf("message: %q\n", noticeMsg)
 				return nil
 			}
 
@@ -663,6 +669,7 @@ block faces (block, heavy, compact, wide).`,
 			if res.customised {
 				renderFont = res.fontChoice
 				renderColor = res.colorChoice
+				persistStyle = true
 			}
 		}
 	},
@@ -711,10 +718,14 @@ func saveSessionState(next session.State) error {
 		return err
 	}
 	if strings.TrimSpace(next.Color) == "" {
-		next.Color = current.Color
+		if _, err := parseColor(current.Color); err == nil {
+			next.Color = current.Color
+		}
 	}
 	if strings.TrimSpace(next.Font) == "" {
-		next.Font = current.Font
+		if font.Has(current.Font) {
+			next.Font = current.Font
+		}
 	}
 	if strings.TrimSpace(next.Text) == "" {
 		next.Text = current.Text

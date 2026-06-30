@@ -146,6 +146,7 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 					cfg.Font = &sessState.Font
 				}
 			}
+			return runConfigPicker(path, cfg)
 		}
 
 		path, err := config.Path()
