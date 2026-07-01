@@ -17,6 +17,7 @@ import (
 type Config struct {
 	Color  *string `toml:"color"`
 	Font   *string `toml:"font"`
+	Frame  *string `toml:"frame"`
 	Bold   *bool   `toml:"bold"`
 	Hint   *string `toml:"hint"`
 	NoHint *bool   `toml:"no_hint"`
@@ -34,6 +35,13 @@ const Template = `# plaqq configuration
 # Font used to render the notice. Block fonts: "compact" (default), "block",
 # "heavy", "wide".
 # font = "compact"
+
+# Notice frame: a border around the rendered text. One of:
+# "none" (default — no border), "single" (light box-drawing), "double" (heavy
+# box-drawing), or "block" (full block characters). Frames can wrap any font;
+# block fonts get a larger inside-frame margin so the border doesn't crowd
+# the glyphs.
+# frame = "single"
 
 # Render the notice text in bold.
 # bold = true
@@ -107,6 +115,9 @@ func Save(path string, cfg *Config) error {
 	}
 	if cfg.Font != nil {
 		fmt.Fprintf(&b, "font = %s\n", strconv.Quote(*cfg.Font))
+	}
+	if cfg.Frame != nil {
+		fmt.Fprintf(&b, "frame = %s\n", strconv.Quote(*cfg.Frame))
 	}
 	if cfg.Bold != nil {
 		fmt.Fprintf(&b, "bold = %t\n", *cfg.Bold)

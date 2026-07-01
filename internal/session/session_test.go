@@ -11,7 +11,7 @@ import (
 
 func TestSaveThenLoadRoundTrips(t *testing.T) {
 	store := NewStore(t.TempDir(), 1001)
-	in := State{Color: "alert", Font: "heavy", Text: "deploy starting"}
+	in := State{Color: "alert", Font: "heavy", Frame: "double", Text: "deploy starting"}
 
 	if err := store.Save(in); err != nil {
 		t.Fatalf("Save: %v", err)
@@ -24,6 +24,9 @@ func TestSaveThenLoadRoundTrips(t *testing.T) {
 	}
 	if got != in {
 		t.Fatalf("Load = %+v; want %+v", got, in)
+	}
+	if got.Empty() {
+		t.Errorf("loaded state with Frame set reports Empty() = true; want false")
 	}
 	if warnings.Len() != 0 {
 		t.Fatalf("unexpected warnings: %s", warnings.String())
@@ -131,7 +134,7 @@ func TestMalformedFileWarnsAndReturnsEmpty(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(store.Path()), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(store.Path(), []byte("font = "), 0o600); err != nil {
+	if err := os.WriteFile(store.Path(), []byte("font = \nframe = \"single\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -154,7 +157,7 @@ func TestInvalidRecordWarnsAndReturnsEmpty(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(store.Path()), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(store.Path(), []byte("font = 42\ncolor = \"alert\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(store.Path(), []byte("font = 42\ncolor = \"alert\"\nframe = \"double\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -168,6 +171,57 @@ func TestInvalidRecordWarnsAndReturnsEmpty(t *testing.T) {
 	}
 	if warn := warnings.String(); !strings.Contains(warn, "plaqq: warning: ignoring session state") {
 		t.Fatalf("warning = %q; want warning", warn)
+	}
+}
+
+func TestFrameAloneIsNonEmpty(t *testing.T) {
+	s := State{Frame: "single"}
+	if s.Empty() {
+		t.Errorf("State{Frame: %q}.Empty() = true; want false", s.Frame)
+	}
+}
+
+func TestSaveAtomicPreservesFrame(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX file mode expectations do not apply on Windows")
+	}
+
+	store := NewStore(t.TempDir(), 1004)
+	if err := os.MkdirAll(filepath.Dir(store.Path()), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(store.Path(), []byte("font = \"block\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	in := State{Color: "ok", Font: "compact", Frame: "double", Text: "with frame"}
+	if err := store.Save(in); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	got, err := os.ReadFile(store.Path())
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	text := string(got)
+	if strings.Contains(text, "block") || !strings.Contains(text, `frame = "double"`) {
+		t.Fatalf("state file content = %q; want replacement preserving frame", text)
+	}
+
+	loaded, err := store.Load(nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if loaded != in {
+		t.Fatalf("Load = %+v; want %+v", loaded, in)
+	}
+
+	info, err := os.Stat(store.Path())
+	if err != nil {
+		t.Fatalf("stat state file: %v", err)
+	}
+	if mode := info.Mode().Perm(); mode != 0o600 {
+		t.Fatalf("state file mode = %o; want 0600", mode)
 	}
 }
 

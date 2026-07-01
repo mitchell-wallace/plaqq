@@ -17,12 +17,13 @@ import (
 type State struct {
 	Color string `toml:"color"`
 	Font  string `toml:"font"`
+	Frame string `toml:"frame"`
 	Text  string `toml:"text"`
 }
 
 // Empty reports whether the record has no values set.
 func (s State) Empty() bool {
-	return strings.TrimSpace(s.Color) == "" && strings.TrimSpace(s.Font) == "" && strings.TrimSpace(s.Text) == ""
+	return strings.TrimSpace(s.Color) == "" && strings.TrimSpace(s.Font) == "" && strings.TrimSpace(s.Frame) == "" && strings.TrimSpace(s.Text) == ""
 }
 
 // Store reads and writes the session-state record for one terminal key.
@@ -90,6 +91,7 @@ func (s Store) Load(warn io.Writer) (State, error) {
 
 	state.Color = strings.TrimSpace(state.Color)
 	state.Font = strings.TrimSpace(state.Font)
+	state.Frame = strings.TrimSpace(state.Frame)
 	state.Text = strings.TrimSpace(state.Text)
 	return state, nil
 }
@@ -157,6 +159,9 @@ func formatState(state State) string {
 	}
 	if font := strings.TrimSpace(state.Font); font != "" {
 		fmt.Fprintf(&b, "font = %s\n", strconv.Quote(font))
+	}
+	if frame := strings.TrimSpace(state.Frame); frame != "" {
+		fmt.Fprintf(&b, "frame = %s\n", strconv.Quote(frame))
 	}
 	if text := strings.TrimSpace(state.Text); text != "" {
 		fmt.Fprintf(&b, "text = %s\n", strconv.Quote(text))
