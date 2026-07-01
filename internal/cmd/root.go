@@ -606,12 +606,13 @@ var rootCmd = &cobra.Command{
 terminal. Space dismisses the notice; Enter returns to the prompt so the message,
 font, or color can be edited and shown again.
 
-The font, color, bold weight, and dismiss hint can be customized with the
---font, --color, --bold, --hint, and --no-hint flags, or set as persistent
+The font, color, bold weight, frame, and dismiss hint can be customized with the
+--font, --color, --bold, --frame, --hint, and --no-hint flags, or set as persistent
 defaults via 'plaqq config' (an interactive picker). Flags override the config.
 
-Colors accept a preset name (info, alert, warn, ok, focus), a hex code, or an ANSI index. Fonts include Unicode
-block faces (block, heavy, compact, wide).`,
+Colors accept a preset name (info, alert, warn, ok, focus), a hex code, or an ANSI index. Fonts include
+the plain 'terminal' face and the Unicode block faces (block, heavy, compact, wide). The frame
+optionally wraps the notice in a box-drawing border (none, single, double, block).`,
 	Example: `  plaqq "deploy starting"
   plaqq --color alert "build failed"
   plaqq --font heavy --color "#ff5f87" "build failed"
