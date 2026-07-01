@@ -1132,43 +1132,46 @@ func TestGetScreenLinesBlockFrameInvertedOnHeavy(t *testing.T) {
 	lines := m.getScreenLines()
 	stripped := make([]string, len(lines))
 	for i, line := range lines {
-		stripped[i] = strings.TrimSpace(stripANSI(line))
+		stripped[i] = stripANSI(line)
 	}
 
 	foundTopLowerAll := false
 	foundBottomUpperAll := false
-	foundLeadingBlank := false
-	foundTrailingBlank := false
-	blankCount := 0
+	sideBlankRowCount := 0
 	for _, line := range stripped {
-		if line == "" {
-			blankCount++
-			continue
-		}
-		if isAllLowerHalf(line) {
+		trimmed := strings.TrimSpace(line)
+		if isAllLowerHalf(trimmed) {
 			foundTopLowerAll = true
 		}
-		if isAllUpperHalf(line) {
+		if isAllUpperHalf(trimmed) {
 			foundBottomUpperAll = true
 		}
-	}
-	if blankCount >= 1 {
-		foundLeadingBlank = stripped[0] == ""
-		foundTrailingBlank = stripped[len(stripped)-1] == ""
+		if isSideBlankBuffer(trimmed) {
+			sideBlankRowCount++
+		}
 	}
 
-	if !foundLeadingBlank {
-		t.Errorf("expected a blank leading row before the top edge for heavy+block; not found in %v", stripped)
-	}
-	if !foundTrailingBlank {
-		t.Errorf("expected a blank trailing row after the bottom edge for heavy+block; not found in %v", stripped)
-	}
 	if !foundTopLowerAll {
 		t.Errorf("expected a row made entirely of ▄ (top edge with half-block corners) for heavy+block; not found in %v", stripped)
 	}
 	if !foundBottomUpperAll {
 		t.Errorf("expected a row made entirely of ▀ (bottom edge with half-block corners) for heavy+block; not found in %v", stripped)
 	}
+	if sideBlankRowCount != 2 {
+		t.Errorf("expected 2 side-blank buffer rows (one above content, one below) for heavy+block; got %d in %v", sideBlankRowCount, stripped)
+	}
+}
+
+func isSideBlankBuffer(line string) bool {
+	if len([]rune(line)) < 2 {
+		return false
+	}
+	runes := []rune(line)
+	if runes[0] != '█' || runes[len(runes)-1] != '█' {
+		return false
+	}
+	inner := string(runes[1 : len(runes)-1])
+	return strings.TrimSpace(inner) == ""
 }
 
 func isAllLowerHalf(s string) bool {

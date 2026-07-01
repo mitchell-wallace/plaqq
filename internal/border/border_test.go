@@ -232,7 +232,7 @@ func TestBlockWrapSplit(t *testing.T) {
 
 func TestBlockWrapInverted(t *testing.T) {
 	got := Block.Wrap([]string{"ab"}, 1, BlockFrameInverted)
-	want := []string{"      ", "▄▄▄▄▄▄", "█ ab █", "▀▀▀▀▀▀", "      "}
+	want := []string{"▄▄▄▄▄▄", "█    █", "█ ab █", "█    █", "▀▀▀▀▀▀"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Block.Wrap([ab], 1, Inverted) = %q; want %q", got, want)
 	}
@@ -259,19 +259,22 @@ func TestBlockWrapSplitBlankContent(t *testing.T) {
 func TestBlockWrapInvertedHalfBlockCorners(t *testing.T) {
 	got := Block.Wrap([]string{"ab"}, 2, BlockFrameInverted)
 	if len(got) != 5 {
-		t.Fatalf("Inverted output has %d rows; want 5 (blank + 3 frame + blank)", len(got))
+		t.Fatalf("Inverted output has %d rows; want 5 (top + buffer + content + buffer + bottom)", len(got))
 	}
-	if strings.TrimSpace(got[0]) != "" {
-		t.Errorf("Inverted leading row = %q; want all-blank", got[0])
+	if got[0] != "▄▄▄▄▄▄▄▄" {
+		t.Errorf("Inverted top edge = %q; want all lower-half (corners included)", got[0])
 	}
-	if got[1] != "▄▄▄▄▄▄▄▄" {
-		t.Errorf("Inverted top edge = %q; want all lower-half (corners included)", got[1])
+	if got[1] != "█      █" {
+		t.Errorf("Inverted top buffer = %q; want side-blank (full sides, blank inside)", got[1])
 	}
-	if got[3] != "▀▀▀▀▀▀▀▀" {
-		t.Errorf("Inverted bottom edge = %q; want all upper-half (corners included)", got[3])
+	if got[2] != "█  ab  █" {
+		t.Errorf("Inverted content = %q; want framed content", got[2])
 	}
-	if strings.TrimSpace(got[4]) != "" {
-		t.Errorf("Inverted trailing row = %q; want all-blank", got[4])
+	if got[3] != "█      █" {
+		t.Errorf("Inverted bottom buffer = %q; want side-blank (full sides, blank inside)", got[3])
+	}
+	if got[4] != "▀▀▀▀▀▀▀▀" {
+		t.Errorf("Inverted bottom edge = %q; want all upper-half (corners included)", got[4])
 	}
 }
 

@@ -186,17 +186,17 @@ func (k Kind) Wrap(rows []string, hMargin int, mode BlockFrameMode) []string {
 	}
 
 	out := make([]string, 0, len(padded)+4)
-	if k == Block && mode == BlockFrameInverted {
-		out = append(out, strings.Repeat(" ", inner+2))
-	}
 	out = append(out, buildEdge(g.topLeft, g.top, g.topRight, inner))
+	if k == Block && mode == BlockFrameInverted {
+		out = append(out, g.side+strings.Repeat(" ", inner)+g.side)
+	}
 	for _, row := range padded {
 		out = append(out, g.side+row+g.side)
 	}
-	out = append(out, buildEdge(g.bottomLeft, g.bottom, g.bottomRight, inner))
 	if k == Block && mode == BlockFrameInverted {
-		out = append(out, strings.Repeat(" ", inner+2))
+		out = append(out, g.side+strings.Repeat(" ", inner)+g.side)
 	}
+	out = append(out, buildEdge(g.bottomLeft, g.bottom, g.bottomRight, inner))
 	return out
 }
 
