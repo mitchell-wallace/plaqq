@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mitchell-wallace/plaqq/internal/border"
 	"github.com/mitchell-wallace/plaqq/internal/config"
 	"github.com/mitchell-wallace/plaqq/internal/font"
 	"github.com/mitchell-wallace/plaqq/internal/session"
@@ -24,7 +25,7 @@ func TestSeedFormStateTolerance(t *testing.T) {
 	}
 
 	state1 := seedFormState(cfg1)
-	fontChoice, colorChoice, customColor, bold, showHint, hintText := state1.fontChoice, state1.colorChoice, state1.customColor, state1.bold, state1.showHint, state1.hintText
+	fontChoice, colorChoice, customColor, bold, showHint, hintText, frameChoice := state1.fontChoice, state1.colorChoice, state1.customColor, state1.bold, state1.showHint, state1.hintText, state1.frameChoice
 
 	if fontChoice != font.DefaultName {
 		t.Errorf("expected fontChoice to fall back to %q, got %q", font.DefaultName, fontChoice)
@@ -43,6 +44,9 @@ func TestSeedFormStateTolerance(t *testing.T) {
 	}
 	if hintText != defaultHint {
 		t.Errorf("expected hintText to default to %q, got %q", defaultHint, hintText)
+	}
+	if frameChoice != "" {
+		t.Errorf("expected frameChoice to be empty when config Frame is nil, got %q", frameChoice)
 	}
 
 	// 2. Config with valid font and color preset should be seeded correctly
@@ -81,15 +85,40 @@ func TestSeedFormStateTolerance(t *testing.T) {
 	}
 }
 
+func TestSeedFormStateFrame(t *testing.T) {
+	// Unset Frame -> frameChoice remains empty
+	cfg1 := &config.Config{}
+	if got := seedFormState(cfg1).frameChoice; got != "" {
+		t.Errorf("expected frameChoice to be empty when cfg.Frame is nil, got %q", got)
+	}
+
+	// Valid frame -> seeded
+	good := "block"
+	cfg2 := &config.Config{Frame: &good}
+	if got := seedFormState(cfg2).frameChoice; got != "block" {
+		t.Errorf("expected frameChoice to be %q, got %q", "block", got)
+	}
+
+	// Invalid frame -> tolerance, frameChoice stays empty
+	bad := "nope"
+	cfg3 := &config.Config{Frame: &bad}
+	if got := seedFormState(cfg3).frameChoice; got != "" {
+		t.Errorf("expected frameChoice to be empty for unknown frame, got %q", got)
+	}
+}
+
 func TestBuildSavedConfig(t *testing.T) {
 	// 1. If choices are defaults, the saved Config should have nil fields to remain minimal
-	cfg := buildSavedConfig(font.DefaultName, colorDefaultChoice, "", true, true, defaultHint)
+	cfg := buildSavedConfig(font.DefaultName, colorDefaultChoice, "", true, true, defaultHint, border.DefaultName)
 
 	if cfg.Font != nil {
 		t.Errorf("expected default font to be omitted (nil), got %q", *cfg.Font)
 	}
 	if cfg.Color != nil {
 		t.Errorf("expected default color to be omitted (nil), got %q", *cfg.Color)
+	}
+	if cfg.Frame != nil {
+		t.Errorf("expected default frame to be omitted (nil), got %q", *cfg.Frame)
 	}
 	if cfg.Bold == nil || !*cfg.Bold {
 		t.Errorf("expected bold to be saved as true, got %v", cfg.Bold)
@@ -102,13 +131,16 @@ func TestBuildSavedConfig(t *testing.T) {
 	}
 
 	// 2. If choices are custom/presets, they should be written
-	cfg2 := buildSavedConfig("heavy", "warn", "", false, false, "custom hint")
+	cfg2 := buildSavedConfig("heavy", "warn", "", false, false, "custom hint", "single")
 
 	if cfg2.Font == nil || *cfg2.Font != "heavy" {
 		t.Errorf("expected font to be saved as 'heavy', got %v", cfg2.Font)
 	}
 	if cfg2.Color == nil || *cfg2.Color != "warn" {
 		t.Errorf("expected color to be saved as 'warn', got %v", cfg2.Color)
+	}
+	if cfg2.Frame == nil || *cfg2.Frame != "single" {
+		t.Errorf("expected frame to be saved as 'single', got %v", cfg2.Frame)
 	}
 	if cfg2.Bold == nil || *cfg2.Bold != false {
 		t.Errorf("expected bold to be saved as false, got %v", cfg2.Bold)
@@ -117,9 +149,12 @@ func TestBuildSavedConfig(t *testing.T) {
 		t.Errorf("expected no_hint to be saved as true, got %v", cfg2.NoHint)
 	}
 	// Note: hint text is not saved if showHint is false, because it's hidden. Let's test showHint = true with custom hint.
-	cfg3 := buildSavedConfig("compact", colorCustomChoice, "#aabbcc", true, true, "custom hint")
+	cfg3 := buildSavedConfig("compact", colorCustomChoice, "#aabbcc", true, true, "custom hint", "block")
 	if cfg3.Color == nil || *cfg3.Color != "#aabbcc" {
 		t.Errorf("expected custom color to be saved as '#aabbcc', got %v", cfg3.Color)
+	}
+	if cfg3.Frame == nil || *cfg3.Frame != "block" {
+		t.Errorf("expected frame to be saved as 'block', got %v", cfg3.Frame)
 	}
 	if cfg3.Hint == nil || *cfg3.Hint != "custom hint" {
 		t.Errorf("expected custom hint to be saved, got %v", cfg3.Hint)
@@ -131,6 +166,7 @@ func resetConfigFlags() {
 	flagConfigClear = false
 	flagConfigColor = ""
 	flagConfigFont = ""
+	flagConfigFrame = ""
 	jsonOutput = false
 	rootCmd.SetArgs(nil)
 	rootCmd.Flags().VisitAll(func(f *pflag.Flag) {
@@ -288,6 +324,16 @@ func TestConfigValidationErrors(t *testing.T) {
 			args:    []string{"--session", "--font", "invalid_font"},
 			wantErr: "unknown font",
 		},
+		{
+			name:    "frame without session",
+			args:    []string{"--frame", "single"},
+			wantErr: "flag --frame requires --session",
+		},
+		{
+			name:    "invalid session frame",
+			args:    []string{"--session", "--frame", "nope_frame"},
+			wantErr: "unknown frame",
+		},
 	}
 
 	for _, tt := range tests {
@@ -335,5 +381,123 @@ func TestConfigSessionJSON(t *testing.T) {
 
 	if !strings.Contains(out, `"color":"alert"`) || !strings.Contains(out, `"font":"heavy"`) {
 		t.Errorf("expected output to contain json representations of color and font, got %q", out)
+	}
+}
+
+func TestConfigSessionSetFrame(t *testing.T) {
+	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "config.toml"))
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	resetConfigFlags()
+	if err := session.Save(session.State{Text: "last deploy", Color: "alert"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"config", "--session", "--frame", "single"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("config --session --frame: %v", err)
+	}
+
+	state, err := session.Load(nil)
+	if err != nil {
+		t.Fatalf("session Load: %v", err)
+	}
+	if state.Frame != "single" {
+		t.Errorf("expected session frame 'single', got %q", state.Frame)
+	}
+	if state.Text != "last deploy" {
+		t.Errorf("expected session text to be preserved, got %q", state.Text)
+	}
+	if state.Color != "alert" {
+		t.Errorf("expected session color to be preserved, got %q", state.Color)
+	}
+}
+
+func TestConfigSessionClearAfterFrame(t *testing.T) {
+	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "config.toml"))
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	resetConfigFlags()
+
+	if err := session.Save(session.State{Color: "focus", Font: "compact", Frame: "single"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+
+	state, err := session.Load(nil)
+	if err != nil || state.Empty() {
+		t.Fatalf("expected non-empty session before clear")
+	}
+
+	rootCmd.SetArgs([]string{"config", "--session", "--clear"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("config --session --clear: %v", err)
+	}
+
+	state, err = session.Load(nil)
+	if err != nil {
+		t.Fatalf("session Load: %v", err)
+	}
+	if !state.Empty() {
+		t.Errorf("expected empty session state after clear, got %+v", state)
+	}
+}
+
+func TestConfigSessionJSONWithFrame(t *testing.T) {
+	t.Setenv("PLAQQ_CONFIG", filepath.Join(t.TempDir(), "config.toml"))
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	resetConfigFlags()
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	if err := session.Save(session.State{Color: "alert", Font: "heavy", Frame: "block"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"config", "--session", "--json-output"})
+	err := rootCmd.Execute()
+	w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("config --session --json-output: %v", err)
+	}
+
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	out := buf.String()
+
+	if !strings.Contains(out, `"frame":"block"`) {
+		t.Errorf("expected output to contain \"frame\":\"block\", got %q", out)
+	}
+}
+
+func TestFrameOptions(t *testing.T) {
+	opts := frameOptions()
+	if len(opts) != 4 {
+		t.Fatalf("expected 4 frame options, got %d", len(opts))
+	}
+	if opts[0].Value != border.DefaultName {
+		t.Errorf("expected first option to be the default %q, got %q", border.DefaultName, opts[0].Value)
+	}
+	if !strings.Contains(opts[0].Key, "(default)") {
+		t.Errorf("expected first option label to contain '(default)', got %q", opts[0].Key)
+	}
+	want := border.Names()
+	for i, o := range opts {
+		if o.Value != want[i] {
+			t.Errorf("option %d: expected value %q, got %q", i, want[i], o.Value)
+		}
+	}
+}
+
+func TestConfigSummaryIncludesFrame(t *testing.T) {
+	frame := "single"
+	cfg := &config.Config{Frame: &frame}
+	out := configSummary(cfg)
+	if !strings.Contains(out, "frame") {
+		t.Errorf("expected summary to mention frame, got %q", out)
+	}
+	if !strings.Contains(out, "single") {
+		t.Errorf("expected summary to contain 'single', got %q", out)
 	}
 }

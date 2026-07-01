@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
+	"github.com/mitchell-wallace/plaqq/internal/border"
 	"github.com/mitchell-wallace/plaqq/internal/config"
 	"github.com/mitchell-wallace/plaqq/internal/font"
 	"github.com/mitchell-wallace/plaqq/internal/session"
@@ -24,6 +25,7 @@ var (
 	flagConfigClear bool
 	flagConfigColor string
 	flagConfigFont  string
+	flagConfigFrame string
 )
 
 var configCmd = &cobra.Command{
@@ -43,6 +45,9 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 			if cmd.Flags().Changed("color") || cmd.Flags().Changed("font") {
 				return errors.New("flags --color and --font require --session")
 			}
+			if cmd.Flags().Changed("frame") {
+				return errors.New("flag --frame requires --session")
+			}
 		}
 
 		if flagSession {
@@ -59,7 +64,7 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 			}
 
 			// If flags are set, save directly without picker
-			if cmd.Flags().Changed("color") || cmd.Flags().Changed("font") {
+			if cmd.Flags().Changed("color") || cmd.Flags().Changed("font") || cmd.Flags().Changed("frame") {
 				sessState, err := session.Load(styleWarningOutput)
 				if err != nil {
 					return err
@@ -82,6 +87,15 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 					}
 					sessState.Font = fontVal
 				}
+				if cmd.Flags().Changed("frame") {
+					frameVal := strings.TrimSpace(flagConfigFrame)
+					if frameVal != "" {
+						if _, err := border.Parse(frameVal); err != nil {
+							return err
+						}
+					}
+					sessState.Frame = frameVal
+				}
 
 				if err := session.Save(sessState); err != nil {
 					return err
@@ -92,6 +106,7 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 						"path":  session.Current().Path(),
 						"color": sessState.Color,
 						"font":  sessState.Font,
+						"frame": sessState.Frame,
 						"text":  sessState.Text,
 					})
 					return nil
@@ -107,6 +122,7 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 				var b strings.Builder
 				fmt.Fprintf(&b, "  color    %s\n", str(sessState.Color, "info"))
 				fmt.Fprintf(&b, "  font     %s\n", str(sessState.Font, font.DefaultName))
+				fmt.Fprintf(&b, "  frame    %s\n", str(sessState.Frame, border.DefaultName))
 				fmt.Fprintf(&b, "  text     %s\n", str(sessState.Text, "none"))
 				fmt.Print(b.String())
 				return nil
@@ -120,6 +136,9 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 				}
 				if sessState.Font != "" {
 					m["font"] = sessState.Font
+				}
+				if sessState.Frame != "" {
+					m["frame"] = sessState.Frame
 				}
 				if sessState.Text != "" {
 					m["text"] = sessState.Text
@@ -144,6 +163,9 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 				}
 				if sessState.Font != "" {
 					cfg.Font = &sessState.Font
+				}
+				if sessState.Frame != "" {
+					cfg.Frame = &sessState.Frame
 				}
 			}
 			return runConfigPicker(path, cfg)
@@ -218,6 +240,7 @@ type formState struct {
 	bold        bool
 	showHint    bool
 	hintText    string
+	frameChoice string
 }
 
 // seedFormState determines the initial values for the interactive picker,
@@ -256,12 +279,18 @@ func seedFormState(cfg *config.Config) formState {
 	if cfg.Hint != nil {
 		state.hintText = *cfg.Hint
 	}
+	if cfg.Frame != nil {
+		val := strings.TrimSpace(*cfg.Frame)
+		if border.Has(val) {
+			state.frameChoice = val
+		}
+	}
 	return state
 }
 
 // buildSavedConfig creates a Config object from the picker choices.
 // Fields left at their built-in default are omitted (left nil) so the saved file remains minimal.
-func buildSavedConfig(fontChoice, colorChoice, customColor string, bold, showHint bool, hintText string) *config.Config {
+func buildSavedConfig(fontChoice, colorChoice, customColor string, bold, showHint bool, hintText, frameChoice string) *config.Config {
 	out := &config.Config{}
 	if fontChoice != "" && fontChoice != font.DefaultName {
 		f := fontChoice
@@ -279,6 +308,10 @@ func buildSavedConfig(fontChoice, colorChoice, customColor string, bold, showHin
 	default:
 		c := colorChoice
 		out.Color = &c
+	}
+	if frameChoice != "" && border.Has(frameChoice) && frameChoice != border.DefaultName {
+		f := frameChoice
+		out.Frame = &f
 	}
 	b := bold
 	out.Bold = &b
@@ -302,6 +335,7 @@ func runConfigPicker(path string, cfg *config.Config) error {
 	bold := state.bold
 	showHint := state.showHint
 	hintText := state.hintText
+	frameChoice := state.frameChoice
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -314,6 +348,10 @@ func runConfigPicker(path string, cfg *config.Config) error {
 				Title("Color").
 				Options(colorOptions()...).
 				Value(&colorChoice),
+			huh.NewSelect[string]().
+				Title("Frame").
+				Options(frameOptions()...).
+				Value(&frameChoice),
 		),
 		huh.NewGroup(
 			huh.NewConfirm().
@@ -345,7 +383,7 @@ func runConfigPicker(path string, cfg *config.Config) error {
 		return err
 	}
 
-	out := buildSavedConfig(fontChoice, colorChoice, customColor, bold, showHint, hintText)
+	out := buildSavedConfig(fontChoice, colorChoice, customColor, bold, showHint, hintText, frameChoice)
 
 	if flagSession {
 		state, err := session.Load(styleWarningOutput)
@@ -354,11 +392,15 @@ func runConfigPicker(path string, cfg *config.Config) error {
 		}
 		state.Color = ""
 		state.Font = ""
+		state.Frame = ""
 		if out.Color != nil {
 			state.Color = *out.Color
 		}
 		if out.Font != nil {
 			state.Font = *out.Font
+		}
+		if out.Frame != nil {
+			state.Frame = *out.Frame
 		}
 		if err := session.Save(state); err != nil {
 			return err
@@ -373,6 +415,7 @@ func runConfigPicker(path string, cfg *config.Config) error {
 		var b strings.Builder
 		fmt.Fprintf(&b, "  color    %s\n", str(state.Color, "info"))
 		fmt.Fprintf(&b, "  font     %s\n", str(state.Font, font.DefaultName))
+		fmt.Fprintf(&b, "  frame    %s\n", str(state.Frame, border.DefaultName))
 		fmt.Fprintf(&b, "  text     %s\n", str(state.Text, "none"))
 		fmt.Print(b.String())
 		return nil
@@ -408,6 +451,19 @@ func colorOptions() []huh.Option[string] {
 	return append(opts, huh.NewOption(colorCustomChoice, colorCustomChoice))
 }
 
+func frameOptions() []huh.Option[string] {
+	names := border.Names()
+	opts := make([]huh.Option[string], 0, len(names))
+	for _, name := range names {
+		label := name
+		if name == border.DefaultName {
+			label = name + " (default)"
+		}
+		opts = append(opts, huh.NewOption(label, name))
+	}
+	return opts
+}
+
 func validateOptionalColor(s string) error {
 	if strings.TrimSpace(s) == "" {
 		return nil
@@ -435,6 +491,7 @@ func configSummary(cfg *config.Config) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "  color    %s\n", str(cfg.Color, "info"))
 	fmt.Fprintf(&b, "  font     %s\n", str(cfg.Font, font.DefaultName))
+	fmt.Fprintf(&b, "  frame    %s\n", str(cfg.Frame, border.DefaultName))
 	fmt.Fprintf(&b, "  bold     %s\n", boolStr(cfg.Bold, true))
 	fmt.Fprintf(&b, "  hint     %s\n", str(cfg.Hint, defaultHint))
 	fmt.Fprintf(&b, "  no_hint  %s\n", boolStr(cfg.NoHint, false))
@@ -449,6 +506,9 @@ func configJSON(path string, cfg *config.Config) map[string]any {
 	}
 	if cfg.Font != nil {
 		m["font"] = *cfg.Font
+	}
+	if cfg.Frame != nil {
+		m["frame"] = *cfg.Frame
 	}
 	if cfg.Bold != nil {
 		m["bold"] = *cfg.Bold
@@ -467,6 +527,7 @@ func init() {
 	configCmd.Flags().BoolVar(&flagConfigClear, "clear", false, "remove the session-state record (requires --session)")
 	configCmd.Flags().StringVar(&flagConfigColor, "color", "", "session color: a preset name, a hex code, or an ANSI index")
 	configCmd.Flags().StringVar(&flagConfigFont, "font", "", "session font: one of the registered fonts")
+	configCmd.Flags().StringVar(&flagConfigFrame, "frame", "", "session frame: one of: "+strings.Join(border.Names(), ", "))
 
 	configCmd.AddCommand(configPathCmd, configInitCmd)
 	rootCmd.AddCommand(configCmd)
