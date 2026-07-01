@@ -8,10 +8,11 @@ It takes any custom notice text, renders it in a centered, chunky Unicode block 
 
 ## Features
 
-- **Four Fonts**: Ships four Unicode block faces: `compact` (dense 3-row half-block, default), `block` (clean medium), `heavy` (solid filled block), and `wide` (a roomier, more open medium-weight face).
+- **Five Fonts**: Ships four Unicode block faces — `compact` (dense 3-row half-block, default), `block` (clean medium), `heavy` (solid filled block), `wide` (a roomier, more open medium-weight face) — plus `terminal`, which renders the message as plain terminal text (preserves case, no glyph lookup).
+- **Box-Drawing Frames**: Optionally wrap the rendered notice in a Unicode border (`none`, `single`, `double`, `block`). Works with any font; per-font horizontal margins keep the frame from crowding chunky block faces.
 - **Semantic Adaptive Palette**: Pick from five named semantic colors (`alert`, `warn`, `info` (default), `ok`, `focus`), each utilizing adaptive theme styling to look great on both light and dark terminal backgrounds.
 - **Escape Hatch**: Supply custom hex codes (e.g., `#00f5d4`) or ANSI color indexes (`0`-`255`) for personalized coloring.
-- **Strict Validation**: Invalid font or color preset names in CLI flags or config files trigger a non-zero exit status with a helpful suggestion message.
+- **Strict Validation**: Invalid font, color, or frame values in CLI flags or config files trigger a non-zero exit status with a helpful suggestion message.
 - **Interactive Config Picker**: Run `plaqq config` (no subcommand) to edit your styling defaults in a friendly, interactive form (which tolerates invalid stored configurations for easy repair).
 - **Dynamic Centering & Word Wrapping**: Automatically wraps text to fit within your terminal pane margin and keeps the notice perfectly centered vertically and horizontally.
 - **Fast Notice Actions**: Press `Space` to dismiss, or `Enter` to reopen the prompt and edit the message/font/color.
@@ -53,11 +54,12 @@ plaqq "remember to run e2e tests before pushing"
 
 The notice appearance can be customized with flags (run `plaqq -h` to see them all):
 
-*   **`--font`**: Font used to render the notice. Supported block faces: `compact` (default), `block`, `heavy`, `wide`.
+*   **`--font`**: Font used to render the notice. Supported faces: `compact` (default), `block`, `heavy`, `wide`, plus `terminal` (plain text, preserves case).
     ```bash
     plaqq --font heavy "shipped"
     plaqq --font compact "heads up"
     plaqq --font wide "all clear"
+    plaqq --font terminal "Mixed Case Text"
     ```
 *   **`--color`**: Notice text color. Can be a semantic preset (`alert`, `warn`, `info`, `ok`, `focus`), a hex code (`#00f5d4`), or an ANSI index (`0`-`255`). Defaults to `info` (an adaptive teal).
     ```bash
@@ -74,6 +76,12 @@ The notice appearance can be customized with flags (run `plaqq -h` to see them a
     ```bash
     plaqq --no-hint "stand clear"
     ```
+*   **`--frame`**: Optionally wrap the rendered notice in a box-drawing border. Four values: `none` (default), `single` (light box-drawing: `┌─┐│└┘`), `double` (heavy box-drawing: `╔═╗║╚╝`), `block` (solid `█` characters). The frame can wrap any font; per-font horizontal margins keep the frame from crowding chunky block faces. The frame is dropped on terminals too narrow to fit at least 2 glyphs of content.
+    ```bash
+    plaqq --frame single "remember to merge"
+    plaqq --font terminal --frame double "Deploying"
+    plaqq --font heavy --frame block "FINISHED"
+    ```
 *   **`-c`, `--continue`**: Reopen the last notice text from this terminal pane using the current resolved style.
     ```bash
     plaqq --continue
@@ -82,10 +90,11 @@ The notice appearance can be customized with flags (run `plaqq -h` to see them a
 
 ### Strict Validation
 
-If you specify an unknown named font or color preset (either via CLI flags or in the TOML configuration file), `plaqq` exits with a non-zero status and prints a list of valid choices along with a nearest-match suggestion if one exists:
+If you specify an unknown named font, color preset, or frame (either via CLI flags or in the TOML configuration file), `plaqq` exits with a non-zero status and prints a list of valid choices along with a nearest-match suggestion if one exists:
 
 ```
 plaqq: unknown font "heavyy" from --font flag: valid fonts are compact, block, heavy, wide; did you mean "heavy"?
+plaqq: unknown frame "dbl" from --frame flag: valid frames are none, single, double, block; did you mean "double"?
 ```
 
 **Exception**: The interactive config picker (`plaqq config`) is designed to tolerate invalid config files so that it remains usable as a repair path. It seeds invalid values with defaults, allowing you to select and save valid choices.
@@ -109,6 +118,7 @@ A config file looks like:
 ```toml
 color = "alert"
 font = "heavy"
+frame = "single"
 bold = true
 hint = "press space"
 no_hint = false
@@ -116,7 +126,7 @@ no_hint = false
 
 ### Style Precedence & Resolution
 
-When determining the visual style (color, font, bold, hint, etc.) for a notice, `plaqq` resolves style properties by layering sources from lowest to highest priority:
+When determining the visual style (color, font, frame, bold, hint, etc.) for a notice, `plaqq` resolves style properties by layering sources from lowest to highest priority:
 
 | Priority | Source | Scope | How to Configure / Set |
 | :--- | :--- | :--- | :--- |
@@ -135,7 +145,8 @@ You can set ambient styles for your current shell pane using environment variabl
 | Environment Variable | Style Property | Expected Format |
 |---|---|---|
 | `PLAQQ_COLOR` | Color | Preset name, hex code, or ANSI index |
-| `PLAQQ_FONT` | Font | `block`, `heavy`, `compact`, or `wide` |
+| `PLAQQ_FONT` | Font | `block`, `heavy`, `compact`, `wide`, or `terminal` |
+| `PLAQQ_FRAME` | Frame | `none`, `single`, `double`, or `block` |
 | `PLAQQ_BOLD` | Bold | `true` or `false` |
 | `PLAQQ_HINT` | Hint text | String |
 | `PLAQQ_NO_HINT` | Hide hint | `true` or `false` |
