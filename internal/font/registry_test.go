@@ -4,7 +4,7 @@ import "testing"
 
 func TestNamesIncludeExpected(t *testing.T) {
 	got := Names()
-	want := []string{"compact", "block", "heavy", "wide"}
+	want := []string{"compact", "terminal", "block", "heavy", "wide"}
 	if len(got) != len(want) {
 		t.Fatalf("Names() = %v; want exactly %v", got, want)
 	}
