@@ -533,6 +533,15 @@ func TestCustomiseColorOptions(t *testing.T) {
 	}
 }
 
+func TestConfirmTitle(t *testing.T) {
+	if got := confirmTitle("heavy", "alert"); got != "Font: heavy | Colour: alert" {
+		t.Fatalf("confirmTitle = %q", got)
+	}
+	if got := confirmTitle("", ""); got != "Font: compact | Colour: info" {
+		t.Fatalf("confirmTitle fallback = %q", got)
+	}
+}
+
 // TestCustomiseSessionRoundTrip simulates the customise step writing font+colour
 // to the session store, then a later plaqq resolving style (no flags) picks them
 // up — the "customise sticks for the session" persistence plumbing.

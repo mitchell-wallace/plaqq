@@ -409,13 +409,6 @@ func applyFontLayer(s *styleSettings, value string, source styleValueSource) err
 	return nil
 }
 
-// Sentinel values for the confirm/customise action select. The select stores one
-// of these in the bound value as the user navigates.
-const (
-	actionConfirm   = "Confirm"
-	actionCustomise = "Customise"
-)
-
 // interactiveFormAllowed reports whether the bare-invocation confirm/customise
 // form can run: it needs an interactive stdin TTY and must not be in
 // --json-output mode (the form, like the old huh.NewInput prompt, cannot render
@@ -475,15 +468,15 @@ type interactiveFormResult struct {
 // runInteractiveForm presents the confirm/customise form for a bare invocation
 // (no message argument) and returns the chosen message and style.
 //
-// Group 1 holds the message input plus a Confirm/Customise select (Confirm
-// pre-selected, so the fast path is enter, enter). Group 2 holds the font and
-// colour selects and is shown via WithHideFunc only when Customise is chosen, so
-// the user can shift+tab back to edit the message. Esc and Ctrl-C abort at any
-// step (returned as huh.ErrUserAborted). Each select is seeded from the
-// fully-resolved style.
+// Group 1 holds the message text area plus Confirm/Customise buttons (Confirm
+// selected, so the fast path is enter, enter). Group 2 holds the font and colour
+// selects and is shown via WithHideFunc only when Customise is chosen, so the
+// user can shift+tab back to edit the message. Esc and Ctrl-C abort at any step
+// (returned as huh.ErrUserAborted). Each select is seeded from the fully-resolved
+// style.
 func runInteractiveForm(style styleSettings, initialMessage string) (interactiveFormResult, error) {
 	message := strings.TrimSpace(initialMessage)
-	action := actionConfirm
+	confirm := true
 	fontChoice := seedCustomiseFont(style.font)
 	colorOpts, colorChoice := customiseColorOptions(style.color)
 
@@ -494,9 +487,11 @@ func runInteractiveForm(style styleSettings, initialMessage string) (interactive
 
 	form := huh.NewForm(
 		huh.NewGroup(
-			huh.NewInput().
+			huh.NewText().
 				Title("Notice message").
 				Placeholder("e.g. remember to run e2e tests before pushing").
+				Lines(3).
+				ExternalEditor(false).
 				Value(&message).
 				Validate(func(s string) error {
 					if strings.TrimSpace(s) == "" {
@@ -504,13 +499,13 @@ func runInteractiveForm(style styleSettings, initialMessage string) (interactive
 					}
 					return nil
 				}),
-			huh.NewSelect[string]().
-				Title("Confirm or customise").
-				Options(
-					huh.NewOption("Confirm — show it now", actionConfirm),
-					huh.NewOption("Customise — pick font & color", actionCustomise),
-				).
-				Value(&action),
+			huh.NewConfirm().
+				TitleFunc(func() string {
+					return confirmTitle(fontChoice, colorChoice)
+				}, []any{&fontChoice, &colorChoice}).
+				Affirmative("Confirm").
+				Negative("Customise").
+				Value(&confirm),
 		),
 		huh.NewGroup(
 			huh.NewSelect[string]().
@@ -521,7 +516,7 @@ func runInteractiveForm(style styleSettings, initialMessage string) (interactive
 				Title("Color").
 				Options(colorOpts...).
 				Value(&colorChoice),
-		).WithHideFunc(func() bool { return action != actionCustomise }),
+		).WithHideFunc(func() bool { return confirm }),
 	).WithKeyMap(keymap)
 
 	if err := form.Run(); err != nil {
@@ -532,8 +527,20 @@ func runInteractiveForm(style styleSettings, initialMessage string) (interactive
 		message:     strings.TrimSpace(message),
 		fontChoice:  fontChoice,
 		colorChoice: colorChoice,
-		customised:  action == actionCustomise,
+		customised:  !confirm,
 	}, nil
+}
+
+func confirmTitle(fontName, colorName string) string {
+	return fmt.Sprintf("Font: %s | Colour: %s", displayStyleName(fontName, font.DefaultName), displayStyleName(colorName, "info"))
+}
+
+func displayStyleName(value, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 var rootCmd = &cobra.Command{
