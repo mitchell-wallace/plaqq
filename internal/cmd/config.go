@@ -82,7 +82,7 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 					fontVal := strings.TrimSpace(flagConfigFont)
 					if fontVal != "" {
 						if !font.Has(fontVal) {
-							return fmt.Errorf("unknown font %q: valid fonts are %s", fontVal, strings.Join(font.Names(), ", "))
+							return unknownStyleValueError("font", fontVal, flagStyleSource("font"), font.Names(), "fonts", "")
 						}
 					}
 					sessState.Font = fontVal
@@ -113,18 +113,7 @@ picker. Use the subcommands to inspect or scaffold the file directly.`,
 				}
 
 				fmt.Printf("Saved session styling to %s\n\n", session.Current().Path())
-				str := func(s string, dflt string) string {
-					if s != "" {
-						return s
-					}
-					return dflt + "  (default)"
-				}
-				var b strings.Builder
-				fmt.Fprintf(&b, "  color    %s\n", str(sessState.Color, "info"))
-				fmt.Fprintf(&b, "  font     %s\n", str(sessState.Font, font.DefaultName))
-				fmt.Fprintf(&b, "  frame    %s\n", str(sessState.Frame, border.DefaultName))
-				fmt.Fprintf(&b, "  text     %s\n", str(sessState.Text, "none"))
-				fmt.Print(b.String())
+				fmt.Print(formatSessionSummary(sessState))
 				return nil
 			}
 
@@ -407,18 +396,7 @@ func runConfigPicker(path string, cfg *config.Config) error {
 			return err
 		}
 		fmt.Printf("Saved session styling to %s\n\n", session.Current().Path())
-		str := func(s string, dflt string) string {
-			if s != "" {
-				return s
-			}
-			return dflt + "  (default)"
-		}
-		var b strings.Builder
-		fmt.Fprintf(&b, "  color    %s\n", str(state.Color, "info"))
-		fmt.Fprintf(&b, "  font     %s\n", str(state.Font, font.DefaultName))
-		fmt.Fprintf(&b, "  frame    %s\n", str(state.Frame, border.DefaultName))
-		fmt.Fprintf(&b, "  text     %s\n", str(state.Text, "none"))
-		fmt.Print(b.String())
+		fmt.Print(formatSessionSummary(state))
 		return nil
 	}
 
@@ -471,6 +449,25 @@ func validateOptionalColor(s string) error {
 	}
 	_, err := parseColor(s)
 	return err
+}
+
+// formatSessionSummary renders the per-terminal session state for the
+// "Saved session styling to ..." block, with "(default)" annotations for
+// unset fields. Kept symmetric with configSummary so the two surfaces read
+// the same way.
+func formatSessionSummary(sessState session.State) string {
+	str := func(s, dflt string) string {
+		if s != "" {
+			return s
+		}
+		return dflt + "  (default)"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "  color    %s\n", str(sessState.Color, "info"))
+	fmt.Fprintf(&b, "  font     %s\n", str(sessState.Font, font.DefaultName))
+	fmt.Fprintf(&b, "  frame    %s\n", str(sessState.Frame, border.DefaultName))
+	fmt.Fprintf(&b, "  text     %s\n", str(sessState.Text, "none"))
+	return b.String()
 }
 
 // configSummary renders the effective settings for the saved config, showing

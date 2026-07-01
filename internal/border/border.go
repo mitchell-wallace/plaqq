@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/mitchell-wallace/plaqq/internal/textutil"
 )
 
 type Kind string
@@ -103,7 +105,7 @@ func matchKind(lower string) (Kind, bool) {
 }
 
 func suggest(input string) string {
-	s, ok := suggestName(input, Names())
+	s, ok := textutil.SuggestName(input, Names())
 	if !ok {
 		return ""
 	}

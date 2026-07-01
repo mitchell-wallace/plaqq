@@ -20,12 +20,19 @@ import (
 	"github.com/mitchell-wallace/plaqq/internal/config"
 	"github.com/mitchell-wallace/plaqq/internal/font"
 	"github.com/mitchell-wallace/plaqq/internal/session"
+	"github.com/mitchell-wallace/plaqq/internal/textutil"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 
 const defaultHint = "[ Space: dismiss | Enter: edit ]"
 const replayHint = "Run `plaqq -c` to show again."
+
+// frameScrollbarBuffer is the horizontal cells reserved on the right of the
+// frame when the content overflows the viewport. The scrollbar occupies 1
+// cell, the frame's right edge occupies 1 cell, and the user wants 2 cells
+// of empty space between them so they don't visually collide.
+const frameScrollbarBuffer = 5
 
 const (
 	envColor  = "PLAQQ_COLOR"
@@ -178,87 +185,10 @@ func unknownStyleValueError(kind, value string, source styleValueSource, options
 	}
 	fmt.Fprintf(&b, ": valid %s are %s", optionLabel, strings.Join(options, ", "))
 	b.WriteString(suffix)
-	if suggestion, ok := suggestName(value, options); ok {
+	if suggestion, ok := textutil.SuggestName(value, options); ok {
 		fmt.Fprintf(&b, "; did you mean %q?", suggestion)
 	}
 	return fmt.Errorf("%s", b.String())
-}
-
-func suggestName(input string, options []string) (string, bool) {
-	input = strings.ToLower(strings.TrimSpace(input))
-	if input == "" {
-		return "", false
-	}
-
-	best := ""
-	bestDistance := 0
-	tied := false
-	for _, option := range options {
-		d := editDistance(input, strings.ToLower(option))
-		if best == "" || d < bestDistance {
-			best = option
-			bestDistance = d
-			tied = false
-		} else if d == bestDistance {
-			tied = true
-		}
-	}
-	if best == "" || tied {
-		return "", false
-	}
-
-	limit := 2
-	if len([]rune(input)) > 6 || len([]rune(best)) > 6 {
-		limit = 3
-	}
-	if bestDistance > limit {
-		return "", false
-	}
-	return best, true
-}
-
-func editDistance(a, b string) int {
-	ar := []rune(a)
-	br := []rune(b)
-	if len(ar) == 0 {
-		return len(br)
-	}
-	if len(br) == 0 {
-		return len(ar)
-	}
-
-	prev := make([]int, len(br)+1)
-	for j := range prev {
-		prev[j] = j
-	}
-
-	for i, ca := range ar {
-		curr := make([]int, len(br)+1)
-		curr[0] = i + 1
-		for j, cb := range br {
-			cost := 0
-			if ca != cb {
-				cost = 1
-			}
-			curr[j+1] = minInt(
-				curr[j]+1,
-				prev[j+1]+1,
-				prev[j]+cost,
-			)
-		}
-		prev = curr
-	}
-	return prev[len(br)]
-}
-
-func minInt(a, b, c int) int {
-	if b < a {
-		a = b
-	}
-	if c < a {
-		a = c
-	}
-	return a
 }
 
 // styleSettings is the effective notice styling after layering defaults, the
@@ -923,7 +853,7 @@ func (m *model) getScreenLines() []string {
 		overflowing := len(rows) > m.height
 		buffer := 0
 		if overflowing {
-			buffer = 5
+			buffer = frameScrollbarBuffer
 		}
 		framed := m.frame.Wrap(rows, frameMarginFor(fontName))
 		available := m.width - buffer

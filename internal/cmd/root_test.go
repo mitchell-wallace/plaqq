@@ -720,6 +720,59 @@ func TestCustomiseSessionRoundTripCustomColor(t *testing.T) {
 	}
 }
 
+func TestCustomiseSessionRoundTripFrame(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	if err := session.Save(session.State{Font: "compact", Frame: "double"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+	cmd := newStyleFlagCmd()
+	s, err := resolveStyle(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.font != "compact" || s.frame != "double" {
+		t.Errorf("after customise save, style = {font:%q frame:%q}; want compact/double", s.font, s.frame)
+	}
+}
+
+func TestSaveSessionStatePreservesFrameWhenSavingText(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	if err := session.Save(session.State{Font: "heavy", Color: "alert", Frame: "single"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+
+	if err := saveSessionState(session.State{Text: "new text"}); err != nil {
+		t.Fatalf("saveSessionState text only: %v", err)
+	}
+	state, err := session.Load(nil)
+	if err != nil {
+		t.Fatalf("session Load: %v", err)
+	}
+	want := session.State{Font: "heavy", Color: "alert", Frame: "single", Text: "new text"}
+	if state != want {
+		t.Fatalf("state = %+v; want %+v", state, want)
+	}
+}
+
+func TestSaveSessionStateDropsInvalidFrameWhenSavingText(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	if err := session.Save(session.State{Font: "slant", Color: "not-a-color", Frame: "nope"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+
+	if err := saveSessionState(session.State{Text: "new text"}); err != nil {
+		t.Fatalf("saveSessionState text only: %v", err)
+	}
+	state, err := session.Load(nil)
+	if err != nil {
+		t.Fatalf("session Load: %v", err)
+	}
+	want := session.State{Text: "new text"}
+	if state != want {
+		t.Fatalf("state = %+v; want %+v", state, want)
+	}
+}
+
 // runBareExit invokes the bare (no-message) root path and recovers the exit()
 // panic, returning the captured stderr, the exit code, and whether the guard
 // fired. It is the harness for the non-interactive guard tests.
