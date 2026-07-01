@@ -15,6 +15,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mitchell-wallace/plaqq/internal/border"
 	"github.com/mitchell-wallace/plaqq/internal/config"
 	"github.com/mitchell-wallace/plaqq/internal/font"
 	"github.com/mitchell-wallace/plaqq/internal/session"
@@ -28,6 +29,7 @@ const replayHint = "Run `plaqq -c` to show again."
 const (
 	envColor  = "PLAQQ_COLOR"
 	envFont   = "PLAQQ_FONT"
+	envFrame  = "PLAQQ_FRAME"
 	envBold   = "PLAQQ_BOLD"
 	envHint   = "PLAQQ_HINT"
 	envNoHint = "PLAQQ_NO_HINT"
@@ -42,6 +44,7 @@ var (
 	// Styling flags for the notice display.
 	flagColor    string
 	flagFont     string
+	flagFrame    string
 	flagBold     bool
 	flagHint     string
 	flagNoHint   bool
@@ -52,6 +55,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json-output", false, "emit structured JSON output")
 	rootCmd.Flags().StringVar(&flagColor, "color", "", "notice color: a preset name ("+strings.Join(presetOrder, ", ")+"), a hex code (e.g. #00f5d4), or an ANSI index (0-255); defaults to info")
 	rootCmd.Flags().StringVar(&flagFont, "font", "", "font to render the notice in; one of: "+strings.Join(font.Names(), ", "))
+	rootCmd.Flags().StringVar(&flagFrame, "frame", "", "frame around the notice: one of: "+strings.Join(border.Names(), ", "))
 	rootCmd.Flags().BoolVar(&flagBold, "bold", true, "render the notice text in bold")
 	rootCmd.Flags().StringVar(&flagHint, "hint", defaultHint, "action-hint text shown beneath the notice")
 	rootCmd.Flags().BoolVar(&flagNoHint, "no-hint", false, "hide the dismiss hint")
@@ -261,6 +265,7 @@ func minInt(a, b, c int) int {
 type styleSettings struct {
 	color  string
 	font   string
+	frame  string
 	bold   bool
 	hint   string
 	noHint bool
@@ -270,7 +275,7 @@ type styleSettings struct {
 // built-in defaults, values from the config file, environment variables,
 // session state, then any CLI flags the user explicitly set.
 func resolveStyle(cmd *cobra.Command) (styleSettings, error) {
-	s := styleSettings{color: "", font: "", bold: true, hint: defaultHint, noHint: false}
+	s := styleSettings{color: "", font: "", frame: "", bold: true, hint: defaultHint, noHint: false}
 
 	path, err := config.Path()
 	if err != nil {
@@ -287,6 +292,11 @@ func resolveStyle(cmd *cobra.Command) (styleSettings, error) {
 	}
 	if cfg.Font != nil {
 		if err := applyFontLayer(&s, *cfg.Font, configStyleSource); err != nil {
+			return styleSettings{}, err
+		}
+	}
+	if cfg.Frame != nil {
+		if err := applyFrameLayer(&s, *cfg.Frame, configStyleSource); err != nil {
 			return styleSettings{}, err
 		}
 	}
@@ -318,6 +328,11 @@ func resolveStyle(cmd *cobra.Command) (styleSettings, error) {
 				return styleSettings{}, err
 			}
 		}
+		if state.Frame != "" {
+			if err := applyFrameLayer(&s, state.Frame, sessionStyleSource("frame")); err != nil {
+				return styleSettings{}, err
+			}
+		}
 	}
 
 	if cmd.Flags().Changed("color") {
@@ -327,6 +342,11 @@ func resolveStyle(cmd *cobra.Command) (styleSettings, error) {
 	}
 	if cmd.Flags().Changed("font") {
 		if err := applyFontLayer(&s, flagFont, flagStyleSource("font")); err != nil {
+			return styleSettings{}, err
+		}
+	}
+	if cmd.Flags().Changed("frame") {
+		if err := applyFrameLayer(&s, flagFrame, flagStyleSource("frame")); err != nil {
 			return styleSettings{}, err
 		}
 	}
@@ -351,6 +371,11 @@ func applyEnvLayer(s *styleSettings) error {
 	}
 	if value, ok := os.LookupEnv(envFont); ok && value != "" {
 		if err := applyFontLayer(s, value, envStyleSource(envFont)); err != nil {
+			return err
+		}
+	}
+	if value, ok := os.LookupEnv(envFrame); ok && value != "" {
+		if err := applyFrameLayer(s, value, envStyleSource(envFrame)); err != nil {
 			return err
 		}
 	}
@@ -409,6 +434,18 @@ func applyFontLayer(s *styleSettings, value string, source styleValueSource) err
 	return nil
 }
 
+func applyFrameLayer(s *styleSettings, value string, source styleValueSource) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return source.handleInvalid(styleValueError(source, "frame is empty"))
+	}
+	if _, err := border.Parse(value); err != nil {
+		return source.handleInvalid(unknownStyleValueError("frame", value, source, border.Names(), "frames", ""))
+	}
+	s.frame = value
+	return nil
+}
+
 // interactiveFormAllowed reports whether the bare-invocation confirm/customise
 // form can run: it needs an interactive stdin TTY and must not be in
 // --json-output mode (the form, like the old huh.NewInput prompt, cannot render
@@ -425,6 +462,13 @@ func seedCustomiseFont(resolved string) string {
 		return v
 	}
 	return font.DefaultName
+}
+
+func seedCustomiseFrame(resolved string) string {
+	if v := strings.ToLower(strings.TrimSpace(resolved)); v != "" && border.Has(v) {
+		return v
+	}
+	return border.DefaultName
 }
 
 // customiseColorOptions builds the colour options for the customise select,
@@ -462,6 +506,7 @@ type interactiveFormResult struct {
 	message     string
 	fontChoice  string
 	colorChoice string
+	frameChoice string
 	customised  bool
 }
 
@@ -479,6 +524,7 @@ func runInteractiveForm(style styleSettings, initialMessage string) (interactive
 	confirm := true
 	fontChoice := seedCustomiseFont(style.font)
 	colorOpts, colorChoice := customiseColorOptions(style.color)
+	frameChoice := seedCustomiseFrame(style.frame)
 
 	// Bind both Esc and Ctrl-C to quit so the abort affordance is consistent at
 	// every step (huh only binds Ctrl-C by default).
@@ -501,8 +547,8 @@ func runInteractiveForm(style styleSettings, initialMessage string) (interactive
 				}),
 			huh.NewConfirm().
 				TitleFunc(func() string {
-					return confirmTitle(fontChoice, colorChoice)
-				}, []any{&fontChoice, &colorChoice}).
+					return confirmTitle(fontChoice, colorChoice, frameChoice)
+				}, []any{&fontChoice, &colorChoice, &frameChoice}).
 				Affirmative("Confirm").
 				Negative("Customise").
 				Value(&confirm),
@@ -516,6 +562,10 @@ func runInteractiveForm(style styleSettings, initialMessage string) (interactive
 				Title("Color").
 				Options(colorOpts...).
 				Value(&colorChoice),
+			huh.NewSelect[string]().
+				Title("Frame").
+				Options(frameOptions()...).
+				Value(&frameChoice),
 		).WithHideFunc(func() bool { return confirm }),
 	).WithKeyMap(keymap)
 
@@ -527,12 +577,17 @@ func runInteractiveForm(style styleSettings, initialMessage string) (interactive
 		message:     strings.TrimSpace(message),
 		fontChoice:  fontChoice,
 		colorChoice: colorChoice,
+		frameChoice: frameChoice,
 		customised:  !confirm,
 	}, nil
 }
 
-func confirmTitle(fontName, colorName string) string {
-	return fmt.Sprintf("Font: %s | Colour: %s", displayStyleName(fontName, font.DefaultName), displayStyleName(colorName, "info"))
+func confirmTitle(fontName, colorName, frameName string) string {
+	return fmt.Sprintf("Font: %s | Colour: %s | Frame: %s",
+		displayStyleName(fontName, font.DefaultName),
+		displayStyleName(colorName, "info"),
+		displayStyleName(frameName, border.DefaultName),
+	)
 }
 
 func displayStyleName(value, fallback string) string {
@@ -583,6 +638,7 @@ block faces (block, heavy, compact, wide).`,
 		// by the customise step below.
 		renderFont := style.font
 		renderColor := style.color
+		renderFrame := style.frame
 		persistStyle := false
 
 		var noticeMsg string
@@ -617,6 +673,7 @@ block faces (block, heavy, compact, wide).`,
 			if res.customised {
 				renderFont = res.fontChoice
 				renderColor = res.colorChoice
+				renderFrame = res.frameChoice
 				persistStyle = true
 			}
 		}
@@ -626,6 +683,7 @@ block faces (block, heavy, compact, wide).`,
 			if persistStyle {
 				nextState.Font = renderFont
 				nextState.Color = renderColor
+				nextState.Frame = renderFrame
 			}
 			if err := saveSessionState(nextState); err != nil {
 				warnStyleValue(fmt.Errorf("could not save session state: %w", err))
@@ -642,10 +700,15 @@ block faces (block, heavy, compact, wide).`,
 				noticeColor = c
 			}
 
+			frameKind := border.Kind(strings.ToLower(strings.TrimSpace(renderFrame)))
+			if frameKind == "" {
+				frameKind = border.None
+			}
+
 			updateNoticeChan := make(chan string, 1)
 			startUpdateCheck(updateNoticeChan)
 
-			m := initialModel(noticeMsg, glyphFont, noticeColor, style.bold, style.hint, !style.noHint)
+			m := initialModel(noticeMsg, glyphFont, noticeColor, frameKind, style.bold, style.hint, !style.noHint)
 			p := tea.NewProgram(&m, tea.WithAltScreen(), tea.WithoutCatchPanics())
 			finalModel, err := p.Run()
 			if err != nil {
@@ -666,7 +729,7 @@ block faces (block, heavy, compact, wide).`,
 			if !interactiveFormAllowed(term.IsTerminal(int(os.Stdin.Fd())), jsonOutput) {
 				exit(1, "cannot edit without an interactive terminal")
 			}
-			res, err := runInteractiveForm(styleSettings{color: renderColor, font: renderFont, bold: style.bold, hint: style.hint, noHint: style.noHint}, noticeMsg)
+			res, err := runInteractiveForm(styleSettings{color: renderColor, font: renderFont, frame: renderFrame, bold: style.bold, hint: style.hint, noHint: style.noHint}, noticeMsg)
 			if err != nil {
 				if errors.Is(err, huh.ErrUserAborted) {
 					return nil
@@ -677,6 +740,7 @@ block faces (block, heavy, compact, wide).`,
 			if res.customised {
 				renderFont = res.fontChoice
 				renderColor = res.colorChoice
+				renderFrame = res.frameChoice
 				persistStyle = true
 			}
 		}
@@ -739,6 +803,11 @@ func saveSessionState(next session.State) error {
 			next.Font = current.Font
 		}
 	}
+	if strings.TrimSpace(next.Frame) == "" {
+		if border.Has(current.Frame) {
+			next.Frame = current.Frame
+		}
+	}
 	if strings.TrimSpace(next.Text) == "" {
 		next.Text = current.Text
 	}
@@ -757,6 +826,7 @@ type model struct {
 	hint         string
 	font         font.Font
 	color        lipgloss.TerminalColor
+	frame        border.Kind
 	width        int
 	height       int
 	bold         bool
@@ -765,11 +835,12 @@ type model struct {
 	action       modelAction
 }
 
-func initialModel(text string, glyphFont font.Font, color lipgloss.TerminalColor, bold bool, hint string, showHint bool) model {
+func initialModel(text string, glyphFont font.Font, color lipgloss.TerminalColor, frame border.Kind, bold bool, hint string, showHint bool) model {
 	return model{
 		text:     text,
 		font:     glyphFont,
 		color:    color,
+		frame:    frame,
 		bold:     bold,
 		hint:     hint,
 		showHint: showHint,

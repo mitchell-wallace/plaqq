@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
+	"github.com/mitchell-wallace/plaqq/internal/border"
 	"github.com/mitchell-wallace/plaqq/internal/font"
 	"github.com/mitchell-wallace/plaqq/internal/session"
 	"github.com/spf13/cobra"
@@ -20,10 +21,11 @@ import (
 // package-level vars resolveStyle reads, so flag.Set both records the value and
 // marks the flag as Changed (mirroring real CLI parsing).
 func newStyleFlagCmd() *cobra.Command {
-	flagColor, flagFont, flagBold, flagHint, flagNoHint, flagContinue = "", "", true, defaultHint, false, false
+	flagColor, flagFont, flagFrame, flagBold, flagHint, flagNoHint, flagContinue = "", "", "", true, defaultHint, false, false
 	c := &cobra.Command{Use: "test"}
 	c.Flags().StringVar(&flagColor, "color", "", "")
 	c.Flags().StringVar(&flagFont, "font", "", "")
+	c.Flags().StringVar(&flagFrame, "frame", "", "")
 	c.Flags().BoolVar(&flagBold, "bold", true, "")
 	c.Flags().StringVar(&flagHint, "hint", defaultHint, "")
 	c.Flags().BoolVar(&flagNoHint, "no-hint", false, "")
@@ -35,7 +37,7 @@ func isolateStyleResolution(t *testing.T, configPath string) {
 	t.Helper()
 	t.Setenv("PLAQQ_CONFIG", configPath)
 	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
-	for _, name := range []string{envColor, envFont, envBold, envHint, envNoHint, envText} {
+	for _, name := range []string{envColor, envFont, envFrame, envBold, envHint, envNoHint, envText} {
 		t.Setenv(name, "")
 	}
 }
@@ -57,7 +59,7 @@ func TestResolveStyleDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := styleSettings{color: "", font: "", bold: true, hint: defaultHint, noHint: false}
+	want := styleSettings{color: "", font: "", frame: "", bold: true, hint: defaultHint, noHint: false}
 	if s != want {
 		t.Errorf("defaults = %+v; want %+v", s, want)
 	}
@@ -65,7 +67,7 @@ func TestResolveStyleDefaults(t *testing.T) {
 
 func TestResolveStyleConfigThenFlagOverride(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte("color = \"#aabbcc\"\nfont = \"heavy\"\nbold = false\nhint = \"cfg hint\"\nno_hint = true\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("color = \"#aabbcc\"\nfont = \"heavy\"\nframe = \"single\"\nbold = false\nhint = \"cfg hint\"\nno_hint = true\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	isolateStyleResolution(t, path)
@@ -76,14 +78,14 @@ func TestResolveStyleConfigThenFlagOverride(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := styleSettings{color: "#aabbcc", font: "heavy", bold: false, hint: "cfg hint", noHint: true}
+	want := styleSettings{color: "#aabbcc", font: "heavy", frame: "single", bold: false, hint: "cfg hint", noHint: true}
 	if s != want {
 		t.Errorf("config-only = %+v; want %+v", s, want)
 	}
 
 	// Flags override the config file for the flags that were set.
 	cmd = newStyleFlagCmd()
-	for flag, val := range map[string]string{"color": "#123456", "font": "compact", "bold": "true"} {
+	for flag, val := range map[string]string{"color": "#123456", "font": "compact", "frame": "double", "bold": "true"} {
 		if err := cmd.Flags().Set(flag, val); err != nil {
 			t.Fatal(err)
 		}
@@ -92,8 +94,8 @@ func TestResolveStyleConfigThenFlagOverride(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.color != "#123456" || s.font != "compact" || s.bold != true {
-		t.Errorf("flag override = %+v; want color=#123456 font=compact bold=true", s)
+	if s.color != "#123456" || s.font != "compact" || s.frame != "double" || s.bold != true {
+		t.Errorf("flag override = %+v; want color=#123456 font=compact frame=double bold=true", s)
 	}
 	// Unset flags still fall back to the config file.
 	if s.hint != "cfg hint" || s.noHint != true {
@@ -179,10 +181,131 @@ func TestResolveStyleRejectsUnknownColorConfig(t *testing.T) {
 	)
 }
 
+func TestResolveStyleRejectsUnknownFrameFlag(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	cmd := newStyleFlagCmd()
+	if err := cmd.Flags().Set("frame", "singl"); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := resolveStyle(cmd)
+	requireErrorContains(t, err,
+		`unknown frame "singl"`,
+		"from --frame flag",
+		"none",
+		"single",
+		"double",
+		"block",
+		`did you mean "single"?`,
+	)
+}
+
+func TestResolveStyleRejectsUnknownFrameConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("frame = \"singl\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	isolateStyleResolution(t, path)
+	cmd := newStyleFlagCmd()
+
+	_, err := resolveStyle(cmd)
+	requireErrorContains(t, err,
+		`unknown frame "singl"`,
+		"from config file",
+		"none",
+		"single",
+		"double",
+		"block",
+		`did you mean "single"?`,
+	)
+}
+
+func TestResolveStyleFrameEnvApplies(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	t.Setenv(envFrame, "double")
+	cmd := newStyleFlagCmd()
+
+	s, err := resolveStyle(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.frame != "double" {
+		t.Errorf("s.frame = %q; want %q", s.frame, "double")
+	}
+}
+
+func TestResolveStyleInvalidFrameEnvWarnsAndFallsThrough(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("frame = \"single\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	isolateStyleResolution(t, path)
+	t.Setenv(envFrame, "nope")
+	warnings := captureStyleWarnings(t)
+	cmd := newStyleFlagCmd()
+
+	s, err := resolveStyle(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.frame != "single" {
+		t.Errorf("s.frame = %q; want %q (config value)", s.frame, "single")
+	}
+	warn := warnings.String()
+	for _, substr := range []string{envFrame, `unknown frame "nope"`, "plaqq: warning"} {
+		if !strings.Contains(warn, substr) {
+			t.Fatalf("warnings %q do not contain %q", warn, substr)
+		}
+	}
+}
+
+func TestResolveStyleInvalidFrameSessionWarnsAndFallsThrough(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	if err := session.Save(session.State{Frame: "nope"}); err != nil {
+		t.Fatalf("session Save: %v", err)
+	}
+	warnings := captureStyleWarnings(t)
+	cmd := newStyleFlagCmd()
+
+	s, err := resolveStyle(cmd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.frame != "" {
+		t.Errorf("s.frame = %q; want empty (default fallback)", s.frame)
+	}
+	warn := warnings.String()
+	for _, substr := range []string{"session state frame", `unknown frame "nope"`, "plaqq: warning"} {
+		if !strings.Contains(warn, substr) {
+			t.Fatalf("warnings %q do not contain %q", warn, substr)
+		}
+	}
+}
+
+func TestRunERejectsUnknownFrameFlagBeforeFallback(t *testing.T) {
+	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
+	cmd := newStyleFlagCmd()
+	if err := cmd.Flags().Set("frame", "singl"); err != nil {
+		t.Fatal(err)
+	}
+
+	err := rootCmd.RunE(cmd, []string{"hi"})
+	requireErrorContains(t, err,
+		`unknown frame "singl"`,
+		"from --frame flag",
+		"none",
+		"single",
+		"double",
+		"block",
+		`did you mean "single"?`,
+	)
+}
+
 func TestResolveStyleEnvVarsApply(t *testing.T) {
 	isolateStyleResolution(t, filepath.Join(t.TempDir(), "none.toml"))
 	t.Setenv(envColor, "alert")
 	t.Setenv(envFont, "heavy")
+	t.Setenv(envFrame, "double")
 	t.Setenv(envBold, "false")
 	t.Setenv(envHint, "env hint")
 	t.Setenv(envNoHint, "true")
@@ -192,7 +315,7 @@ func TestResolveStyleEnvVarsApply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := styleSettings{color: "alert", font: "heavy", bold: false, hint: "env hint", noHint: true}
+	want := styleSettings{color: "alert", font: "heavy", frame: "double", bold: false, hint: "env hint", noHint: true}
 	if s != want {
 		t.Errorf("env style = %+v; want %+v", s, want)
 	}
@@ -200,7 +323,7 @@ func TestResolveStyleEnvVarsApply(t *testing.T) {
 
 func TestResolveStylePrecedenceAndPerSettingIndependence(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte("color = \"warn\"\nfont = \"block\"\nbold = true\nhint = \"cfg hint\"\nno_hint = false\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("color = \"warn\"\nfont = \"block\"\nframe = \"single\"\nbold = true\nhint = \"cfg hint\"\nno_hint = false\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	isolateStyleResolution(t, path)
@@ -209,7 +332,7 @@ func TestResolveStylePrecedenceAndPerSettingIndependence(t *testing.T) {
 	t.Setenv(envBold, "false")
 	t.Setenv(envHint, "env hint")
 	t.Setenv(envNoHint, "true")
-	if err := session.Save(session.State{Color: "ok", Font: "compact"}); err != nil {
+	if err := session.Save(session.State{Color: "ok", Font: "compact", Frame: "block"}); err != nil {
 		t.Fatalf("session Save: %v", err)
 	}
 
@@ -222,7 +345,7 @@ func TestResolveStylePrecedenceAndPerSettingIndependence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := styleSettings{color: "focus", font: "compact", bold: false, hint: "env hint", noHint: true}
+	want := styleSettings{color: "focus", font: "compact", frame: "block", bold: false, hint: "env hint", noHint: true}
 	if s != want {
 		t.Errorf("layered style = %+v; want %+v", s, want)
 	}
@@ -230,12 +353,13 @@ func TestResolveStylePrecedenceAndPerSettingIndependence(t *testing.T) {
 
 func TestResolveStyleInvalidEnvWarnsAndFallsThrough(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte("color = \"ok\"\nfont = \"compact\"\nbold = false\nhint = \"cfg hint\"\nno_hint = true\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("color = \"ok\"\nfont = \"compact\"\nframe = \"single\"\nbold = false\nhint = \"cfg hint\"\nno_hint = true\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	isolateStyleResolution(t, path)
 	t.Setenv(envColor, "not-a-color")
 	t.Setenv(envFont, "slant")
+	t.Setenv(envFrame, "nope")
 	t.Setenv(envBold, "maybe")
 	t.Setenv(envNoHint, "perhaps")
 	warnings := captureStyleWarnings(t)
@@ -245,12 +369,12 @@ func TestResolveStyleInvalidEnvWarnsAndFallsThrough(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := styleSettings{color: "ok", font: "compact", bold: false, hint: "cfg hint", noHint: true}
+	want := styleSettings{color: "ok", font: "compact", frame: "single", bold: false, hint: "cfg hint", noHint: true}
 	if s != want {
 		t.Errorf("invalid env fallback = %+v; want %+v", s, want)
 	}
 	warn := warnings.String()
-	for _, substr := range []string{envColor, envFont, envBold, envNoHint, "plaqq: warning"} {
+	for _, substr := range []string{envColor, envFont, envFrame, envBold, envNoHint, "plaqq: warning"} {
 		if !strings.Contains(warn, substr) {
 			t.Fatalf("warnings %q do not contain %q", warn, substr)
 		}
@@ -259,7 +383,7 @@ func TestResolveStyleInvalidEnvWarnsAndFallsThrough(t *testing.T) {
 
 func TestResolveStyleEmptyEnvFallsThroughWithoutWarning(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte("color = \"ok\"\nfont = \"compact\"\nbold = false\nhint = \"cfg hint\"\nno_hint = true\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("color = \"ok\"\nfont = \"compact\"\nframe = \"single\"\nbold = false\nhint = \"cfg hint\"\nno_hint = true\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	isolateStyleResolution(t, path)
@@ -270,7 +394,7 @@ func TestResolveStyleEmptyEnvFallsThroughWithoutWarning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := styleSettings{color: "ok", font: "compact", bold: false, hint: "cfg hint", noHint: true}
+	want := styleSettings{color: "ok", font: "compact", frame: "single", bold: false, hint: "cfg hint", noHint: true}
 	if s != want {
 		t.Errorf("empty env fallback = %+v; want %+v", s, want)
 	}
@@ -391,10 +515,28 @@ func TestSeedCustomiseFont(t *testing.T) {
 	}
 }
 
+func TestSeedCustomiseFrame(t *testing.T) {
+	cases := []struct {
+		resolved string
+		want     string
+	}{
+		{"single", "single"},
+		{"", border.DefaultName},
+		{"   ", "none"},
+		{"nope", "none"},
+		{"  SINGLE  ", "single"},
+	}
+	for _, c := range cases {
+		if got := seedCustomiseFrame(c.resolved); got != c.want {
+			t.Errorf("seedCustomiseFrame(%q) = %q; want %q", c.resolved, got, c.want)
+		}
+	}
+}
+
 func TestModelEnterEditsSpaceDismisses(t *testing.T) {
 	f := font.Get("block")
 	color, _ := parseColor("info")
-	m := initialModel("hello", f, color, true, defaultHint, true)
+	m := initialModel("hello", f, color, border.None, true, defaultHint, true)
 
 	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {
@@ -404,7 +546,7 @@ func TestModelEnterEditsSpaceDismisses(t *testing.T) {
 		t.Fatalf("enter action = %v; want edit", got)
 	}
 
-	m = initialModel("hello", f, color, true, defaultHint, true)
+	m = initialModel("hello", f, color, border.None, true, defaultHint, true)
 	updatedModel, cmd = m.Update(tea.KeyMsg{Type: tea.KeySpace})
 	if cmd == nil {
 		t.Fatal("space should quit the TUI")
@@ -534,11 +676,14 @@ func TestCustomiseColorOptions(t *testing.T) {
 }
 
 func TestConfirmTitle(t *testing.T) {
-	if got := confirmTitle("heavy", "alert"); got != "Font: heavy | Colour: alert" {
+	if got := confirmTitle("heavy", "alert", "single"); got != "Font: heavy | Colour: alert | Frame: single" {
 		t.Fatalf("confirmTitle = %q", got)
 	}
-	if got := confirmTitle("", ""); got != "Font: compact | Colour: info" {
+	if got := confirmTitle("", "", ""); got != "Font: compact | Colour: info | Frame: none" {
 		t.Fatalf("confirmTitle fallback = %q", got)
+	}
+	if got := confirmTitle("heavy", "", ""); got != "Font: heavy | Colour: info | Frame: none" {
+		t.Fatalf("confirmTitle mixed = %q", got)
 	}
 }
 
@@ -647,7 +792,7 @@ func TestTUIScrolling(t *testing.T) {
 
 	// Create a model with a message long enough to wrap and exceed a small height.
 	msg := "HELLO WORLD THIS IS A VERY LONG TEST MESSAGE THAT WILL EXCEED THE HEIGHT OF THE VIEWPORT"
-	m := initialModel(msg, f, color, true, defaultHint, true)
+	m := initialModel(msg, f, color, border.None, true, defaultHint, true)
 
 	// Simulate window size message (width 40, height 10)
 	m.width = 40
