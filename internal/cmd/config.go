@@ -249,12 +249,13 @@ func seedFormState(cfg *config.Config) formState {
 	state := formState{
 		fontChoice:  font.DefaultName,
 		colorChoice: colorDefaultChoice,
+		frameChoice: border.DefaultName,
 		bold:        true,
 		showHint:    true,
 		hintText:    defaultHint,
 	}
 	if cfg.Font != nil && *cfg.Font != "" {
-		val := strings.TrimSpace(*cfg.Font)
+		val := strings.ToLower(strings.TrimSpace(*cfg.Font))
 		if font.Has(val) {
 			state.fontChoice = val
 		}
@@ -280,7 +281,7 @@ func seedFormState(cfg *config.Config) formState {
 		state.hintText = *cfg.Hint
 	}
 	if cfg.Frame != nil {
-		val := strings.TrimSpace(*cfg.Frame)
+		val := strings.ToLower(strings.TrimSpace(*cfg.Frame))
 		if border.Has(val) {
 			state.frameChoice = val
 		}

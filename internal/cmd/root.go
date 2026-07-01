@@ -436,7 +436,7 @@ func applyFontLayer(s *styleSettings, value string, source styleValueSource) err
 }
 
 func applyFrameLayer(s *styleSettings, value string, source styleValueSource) error {
-	value = strings.TrimSpace(value)
+	value = strings.ToLower(strings.TrimSpace(value))
 	if value == "" {
 		return source.handleInvalid(styleValueError(source, "frame is empty"))
 	}

@@ -45,8 +45,8 @@ func TestSeedFormStateTolerance(t *testing.T) {
 	if hintText != defaultHint {
 		t.Errorf("expected hintText to default to %q, got %q", defaultHint, hintText)
 	}
-	if frameChoice != "" {
-		t.Errorf("expected frameChoice to be empty when config Frame is nil, got %q", frameChoice)
+	if frameChoice != border.DefaultName {
+		t.Errorf("expected frameChoice to default to %q, got %q", border.DefaultName, frameChoice)
 	}
 
 	// 2. Config with valid font and color preset should be seeded correctly
@@ -86,24 +86,24 @@ func TestSeedFormStateTolerance(t *testing.T) {
 }
 
 func TestSeedFormStateFrame(t *testing.T) {
-	// Unset Frame -> frameChoice remains empty
+	// Unset Frame -> frameChoice defaults to the built-in default
 	cfg1 := &config.Config{}
-	if got := seedFormState(cfg1).frameChoice; got != "" {
-		t.Errorf("expected frameChoice to be empty when cfg.Frame is nil, got %q", got)
+	if got := seedFormState(cfg1).frameChoice; got != border.DefaultName {
+		t.Errorf("expected frameChoice to default to %q when cfg.Frame is nil, got %q", border.DefaultName, got)
 	}
 
-	// Valid frame -> seeded
-	good := "block"
+	// Valid frame -> seeded (also lowercased on the way in)
+	good := "Block"
 	cfg2 := &config.Config{Frame: &good}
 	if got := seedFormState(cfg2).frameChoice; got != "block" {
 		t.Errorf("expected frameChoice to be %q, got %q", "block", got)
 	}
 
-	// Invalid frame -> tolerance, frameChoice stays empty
+	// Invalid frame -> tolerance, frameChoice stays at the default
 	bad := "nope"
 	cfg3 := &config.Config{Frame: &bad}
-	if got := seedFormState(cfg3).frameChoice; got != "" {
-		t.Errorf("expected frameChoice to be empty for unknown frame, got %q", got)
+	if got := seedFormState(cfg3).frameChoice; got != border.DefaultName {
+		t.Errorf("expected frameChoice to default to %q for unknown frame, got %q", border.DefaultName, got)
 	}
 }
 

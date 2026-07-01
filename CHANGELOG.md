@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - **Plain-Text `terminal` Font**: Renders the message as ordinary terminal text (preserves case, no glyph lookup) instead of a chunky block face. Select via `--font terminal` or the config picker.
-- **Box-Drawing Frames**: New `--frame` setting (`none` / `single` / `double` / `block`) optionally wraps the rendered notice in a Unicode box-drawing border. Works with any font; per-font horizontal margins keep the frame from crowding chunky block faces. Frame is dropped on terminals too narrow to fit at least 2 glyphs of content. Resolves through the same five layers as the other style settings (`defaults < config < env < session < flag`); `PLAQQ_FRAME` env var and a new `frame` config / session field.
+- **Box-Drawing Frames**: New `--frame` setting (`none` / `single` / `double` / `block`) optionally wraps the rendered notice in a Unicode box-drawing border. Works with any font; per-font horizontal margins keep the frame from crowding chunky block faces. Frame is dropped on terminals too narrow to fit at least 2 cells of content; a 2-cell buffer is reserved on each side when the content overflows so the scrollbar has room. Resolves through the same five layers as the other style settings (`defaults < config < env < session < flag`); `PLAQQ_FRAME` env var and a new `frame` config / session field.
 
 ### Breaking Changes
 - **FIGlet Fonts Removed**: Removed all 9 `go-figure` FIGlet ASCII fonts (`standard`, `slant`, `banner`, `big`, `small`, `doom`, `larry3d`, `mini`, `cyberlarge`). `plaqq` now ships with Unicode block fonts only (`block`, `heavy`, `compact`, `wide`).

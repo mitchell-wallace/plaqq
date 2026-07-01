@@ -76,7 +76,7 @@ The notice appearance can be customized with flags (run `plaqq -h` to see them a
     ```bash
     plaqq --no-hint "stand clear"
     ```
-*   **`--frame`**: Optionally wrap the rendered notice in a box-drawing border. Four values: `none` (default), `single` (light box-drawing: `┌─┐│└┘`), `double` (heavy box-drawing: `╔═╗║╚╝`), `block` (solid `█` characters). The frame can wrap any font; per-font horizontal margins keep the frame from crowding chunky block faces. The frame is dropped on terminals too narrow to fit at least 2 glyphs of content.
+*   **`--frame`**: Optionally wrap the rendered notice in a box-drawing border. Four values: `none` (default), `single` (light box-drawing: `┌─┐│└┘`), `double` (heavy box-drawing: `╔═╗║╚╝`), `block` (solid `█` characters). The frame can wrap any font; per-font horizontal margins keep the frame from crowding chunky block faces. The frame is dropped on terminals too narrow to fit at least 2 cells of content, and a 2-cell buffer is reserved on each side when the content overflows the viewport so the scrollbar has room.
     ```bash
     plaqq --frame single "remember to merge"
     plaqq --font terminal --frame double "Deploying"
