@@ -1138,9 +1138,11 @@ func TestGetScreenLinesBlockFrameInvertedOnHeavy(t *testing.T) {
 	foundTopLowerAll := false
 	foundBottomUpperAll := false
 	foundLeadingBlank := false
+	foundTrailingBlank := false
+	blankCount := 0
 	for _, line := range stripped {
 		if line == "" {
-			foundLeadingBlank = true
+			blankCount++
 			continue
 		}
 		if isAllLowerHalf(line) {
@@ -1150,9 +1152,16 @@ func TestGetScreenLinesBlockFrameInvertedOnHeavy(t *testing.T) {
 			foundBottomUpperAll = true
 		}
 	}
+	if blankCount >= 1 {
+		foundLeadingBlank = stripped[0] == ""
+		foundTrailingBlank = stripped[len(stripped)-1] == ""
+	}
 
 	if !foundLeadingBlank {
 		t.Errorf("expected a blank leading row before the top edge for heavy+block; not found in %v", stripped)
+	}
+	if !foundTrailingBlank {
+		t.Errorf("expected a blank trailing row after the bottom edge for heavy+block; not found in %v", stripped)
 	}
 	if !foundTopLowerAll {
 		t.Errorf("expected a row made entirely of ▄ (top edge with half-block corners) for heavy+block; not found in %v", stripped)

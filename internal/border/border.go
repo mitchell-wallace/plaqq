@@ -185,7 +185,7 @@ func (k Kind) Wrap(rows []string, hMargin int, mode BlockFrameMode) []string {
 		padded[i] = padRow(r, inner, hMargin)
 	}
 
-	out := make([]string, 0, len(padded)+3)
+	out := make([]string, 0, len(padded)+4)
 	if k == Block && mode == BlockFrameInverted {
 		out = append(out, strings.Repeat(" ", inner+2))
 	}
@@ -194,6 +194,9 @@ func (k Kind) Wrap(rows []string, hMargin int, mode BlockFrameMode) []string {
 		out = append(out, g.side+row+g.side)
 	}
 	out = append(out, buildEdge(g.bottomLeft, g.bottom, g.bottomRight, inner))
+	if k == Block && mode == BlockFrameInverted {
+		out = append(out, strings.Repeat(" ", inner+2))
+	}
 	return out
 }
 
