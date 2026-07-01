@@ -133,7 +133,7 @@ func TestNames(t *testing.T) {
 
 func TestNoneWrapNoOp(t *testing.T) {
 	in := []string{"a", "b", "c"}
-	got := None.Wrap(in, 1)
+	got := None.Wrap(in, 1, BlockFrameSplit)
 	if !reflect.DeepEqual(got, in) {
 		t.Errorf("None.Wrap(...) = %v; want %v (unchanged)", got, in)
 	}
@@ -141,11 +141,11 @@ func TestNoneWrapNoOp(t *testing.T) {
 
 func TestWrapEmptyRowsNoOp(t *testing.T) {
 	for _, k := range []Kind{Single, Double, Block} {
-		got := k.Wrap(nil, 1)
+		got := k.Wrap(nil, 1, BlockFrameSplit)
 		if got != nil {
 			t.Errorf("%s.Wrap(nil) = %v; want nil", k, got)
 		}
-		got = k.Wrap([]string{}, 1)
+		got = k.Wrap([]string{}, 1, BlockFrameSplit)
 		if len(got) != 0 {
 			t.Errorf("%s.Wrap([]) = %v; want empty", k, got)
 		}
@@ -153,7 +153,7 @@ func TestWrapEmptyRowsNoOp(t *testing.T) {
 }
 
 func TestSingleWrapSimple(t *testing.T) {
-	got := Single.Wrap([]string{"hi"}, 1)
+	got := Single.Wrap([]string{"hi"}, 1, BlockFrameSplit)
 	want := []string{"┌────┐", "│ hi │", "└────┘"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Single.Wrap([hi], 1) = %q; want %q", got, want)
@@ -166,7 +166,7 @@ func TestSingleWrapSimple(t *testing.T) {
 }
 
 func TestSingleWrapMultiline(t *testing.T) {
-	got := Single.Wrap([]string{"ab", "cd"}, 1)
+	got := Single.Wrap([]string{"ab", "cd"}, 1, BlockFrameSplit)
 	want := []string{"┌────┐", "│ ab │", "│ cd │", "└────┘"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Single.Wrap([ab,cd], 1) = %q; want %q", got, want)
@@ -179,7 +179,7 @@ func TestSingleWrapMultiline(t *testing.T) {
 }
 
 func TestSingleWrapBlankRowInContent(t *testing.T) {
-	got := Single.Wrap([]string{"ab", "", "cd"}, 1)
+	got := Single.Wrap([]string{"ab", "", "cd"}, 1, BlockFrameSplit)
 	want := []string{"┌────┐", "│ ab │", "│    │", "│ cd │", "└────┘"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Single.Wrap([ab,'',cd], 1) = %q; want %q", got, want)
@@ -192,7 +192,7 @@ func TestSingleWrapBlankRowInContent(t *testing.T) {
 }
 
 func TestSingleWrapMultiMargin(t *testing.T) {
-	got := Single.Wrap([]string{"ab"}, 3)
+	got := Single.Wrap([]string{"ab"}, 3, BlockFrameSplit)
 	want := []string{"┌────────┐", "│   ab   │", "└────────┘"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Single.Wrap([ab], 3) = %q; want %q", got, want)
@@ -205,7 +205,7 @@ func TestSingleWrapMultiMargin(t *testing.T) {
 }
 
 func TestDoubleWrap(t *testing.T) {
-	got := Double.Wrap([]string{"ab", "cd"}, 1)
+	got := Double.Wrap([]string{"ab", "cd"}, 1, BlockFrameSplit)
 	want := []string{"╔════╗", "║ ab ║", "║ cd ║", "╚════╝"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Double.Wrap([ab,cd], 1) = %q; want %q", got, want)
@@ -217,11 +217,11 @@ func TestDoubleWrap(t *testing.T) {
 	}
 }
 
-func TestBlockWrap(t *testing.T) {
-	got := Block.Wrap([]string{"ab"}, 1)
-	want := []string{"██████", "█ ab █", "██████"}
+func TestBlockWrapSplit(t *testing.T) {
+	got := Block.Wrap([]string{"ab"}, 1, BlockFrameSplit)
+	want := []string{"█▀▀▀▀█", "█ ab █", "█▄▄▄▄█"}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("Block.Wrap([ab], 1) = %q; want %q", got, want)
+		t.Errorf("Block.Wrap([ab], 1, Split) = %q; want %q", got, want)
 	}
 	for i, row := range got {
 		if utf8.RuneCountInString(row) != 6 {
@@ -230,11 +230,24 @@ func TestBlockWrap(t *testing.T) {
 	}
 }
 
-func TestBlockWrapAllBlank(t *testing.T) {
-	got := Block.Wrap([]string{"", ""}, 1)
-	want := []string{"████", "█  █", "█  █", "████"}
+func TestBlockWrapInverted(t *testing.T) {
+	got := Block.Wrap([]string{"ab"}, 1, BlockFrameInverted)
+	want := []string{"      ", "▄▄▄▄▄▄", "█ ab █", "▀▀▀▀▀▀"}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("Block.Wrap(['',''], 1) = %q; want %q", got, want)
+		t.Errorf("Block.Wrap([ab], 1, Inverted) = %q; want %q", got, want)
+	}
+	for i, row := range got {
+		if utf8.RuneCountInString(row) != 6 {
+			t.Errorf("row %d has %d runes; want 6", i, utf8.RuneCountInString(row))
+		}
+	}
+}
+
+func TestBlockWrapSplitBlankContent(t *testing.T) {
+	got := Block.Wrap([]string{"", ""}, 1, BlockFrameSplit)
+	want := []string{"█▀▀█", "█  █", "█  █", "█▄▄█"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Block.Wrap(['',''], 1, Split) = %q; want %q", got, want)
 	}
 	for i, row := range got {
 		if utf8.RuneCountInString(row) != 4 {
@@ -243,8 +256,24 @@ func TestBlockWrapAllBlank(t *testing.T) {
 	}
 }
 
+func TestBlockWrapInvertedHalfBlockCorners(t *testing.T) {
+	got := Block.Wrap([]string{"ab"}, 2, BlockFrameInverted)
+	if len(got) != 4 {
+		t.Fatalf("Inverted output has %d rows; want 4 (blank + 3 frame)", len(got))
+	}
+	if strings.TrimSpace(got[0]) != "" {
+		t.Errorf("Inverted leading row = %q; want all-blank", got[0])
+	}
+	if got[1] != "▄▄▄▄▄▄▄▄" {
+		t.Errorf("Inverted top edge = %q; want all lower-half (corners included)", got[1])
+	}
+	if got[3] != "▀▀▀▀▀▀▀▀" {
+		t.Errorf("Inverted bottom edge = %q; want all upper-half (corners included)", got[3])
+	}
+}
+
 func TestWrapRespectsRuneWidth(t *testing.T) {
-	got := Single.Wrap([]string{"héllo"}, 1)
+	got := Single.Wrap([]string{"héllo"}, 1, BlockFrameSplit)
 	want := []string{
 		"┌───────┐",
 		"│ héllo │",
@@ -261,7 +290,7 @@ func TestWrapRespectsRuneWidth(t *testing.T) {
 }
 
 func TestWrapEmptyRowsAllBlank(t *testing.T) {
-	got := Single.Wrap([]string{"", ""}, 1)
+	got := Single.Wrap([]string{"", ""}, 1, BlockFrameSplit)
 	want := []string{"┌──┐", "│  │", "│  │", "└──┘"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Single.Wrap(['',''], 1) = %q; want %q", got, want)
@@ -275,8 +304,8 @@ func TestWrapEmptyRowsAllBlank(t *testing.T) {
 
 func TestWrapRectangularInvariant(t *testing.T) {
 	rows := []string{"ab", "", "cd", " ", "ef"}
-	for _, k := range []Kind{Single, Double, Block} {
-		got := k.Wrap(rows, 2)
+	for _, k := range []Kind{Single, Double} {
+		got := k.Wrap(rows, 2, BlockFrameSplit)
 		width := utf8.RuneCountInString(got[0])
 		for i, row := range got {
 			if w := utf8.RuneCountInString(row); w != width {
@@ -284,10 +313,24 @@ func TestWrapRectangularInvariant(t *testing.T) {
 			}
 		}
 	}
+	got := Block.Wrap(rows, 2, BlockFrameSplit)
+	width := utf8.RuneCountInString(got[0])
+	for i, row := range got {
+		if w := utf8.RuneCountInString(row); w != width {
+			t.Errorf("Block.Wrap(Split): row %d has %d runes; want %d (rectangular)", i, w, width)
+		}
+	}
+	got = Block.Wrap(rows, 2, BlockFrameInverted)
+	width = utf8.RuneCountInString(got[0])
+	for i, row := range got {
+		if w := utf8.RuneCountInString(row); w != width {
+			t.Errorf("Block.Wrap(Inverted): row %d has %d runes; want %d (rectangular)", i, w, width)
+		}
+	}
 }
 
 func TestWrapZeroMargin(t *testing.T) {
-	got := Single.Wrap([]string{"abc", "de"}, 0)
+	got := Single.Wrap([]string{"abc", "de"}, 0, BlockFrameSplit)
 	want := []string{"┌───┐", "│abc│", "│de │", "└───┘"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Single.Wrap([abc,de], 0) = %q; want %q", got, want)

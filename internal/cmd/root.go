@@ -799,6 +799,13 @@ func frameMarginFor(fontName string) int {
 	}
 }
 
+func blockFrameModeFor(fontName string) border.BlockFrameMode {
+	if fontName == "heavy" {
+		return border.BlockFrameInverted
+	}
+	return border.BlockFrameSplit
+}
+
 func gapRowsFor(f font.Font) int {
 	if _, ok := f.(font.Terminal); ok {
 		return 1
@@ -855,7 +862,7 @@ func (m *model) getScreenLines() []string {
 		if overflowing {
 			buffer = frameScrollbarBuffer
 		}
-		framed := m.frame.Wrap(rows, frameMarginFor(fontName))
+		framed := m.frame.Wrap(rows, frameMarginFor(fontName), blockFrameModeFor(fontName))
 		available := m.width - buffer
 		fits := true
 		for _, row := range framed {

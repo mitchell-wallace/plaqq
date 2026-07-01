@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -1080,4 +1081,107 @@ func TestGetScreenLinesScrollbarBufferReserved(t *testing.T) {
 	if got := m.width - 1 - rightmostCol; got < 3 {
 		t.Errorf("rightmost frame character at column %d; want at least 3 cells from right edge (width %d, gap %d)", rightmostCol, m.width, got)
 	}
+}
+
+var ansiCSI = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
+func stripANSI(s string) string {
+	return ansiCSI.ReplaceAllString(s, "")
+}
+
+func TestGetScreenLinesBlockFrameSplitOnTerminal(t *testing.T) {
+	color, _ := parseColor("info")
+	m := initialModel("hi", font.Terminal{}, color, border.Block, true, defaultHint, true)
+	m.width = 40
+	m.height = 20
+
+	lines := m.getScreenLines()
+	hasUpper := false
+	hasLower := false
+	hasFullCorner := false
+	for _, line := range lines {
+		plain := stripANSI(line)
+		trimmed := strings.TrimSpace(plain)
+		if strings.Contains(trimmed, "▀") {
+			hasUpper = true
+		}
+		if strings.Contains(trimmed, "▄") {
+			hasLower = true
+		}
+		if strings.HasPrefix(trimmed, "█") || strings.HasSuffix(trimmed, "█") {
+			hasFullCorner = true
+		}
+	}
+	if !hasUpper {
+		t.Errorf("expected upper-half block in top border for terminal+block; not found in %v", lines)
+	}
+	if !hasLower {
+		t.Errorf("expected lower-half block in bottom border for terminal+block; not found in %v", lines)
+	}
+	if !hasFullCorner {
+		t.Errorf("expected full-block corners for terminal+block; not found in %v", lines)
+	}
+}
+
+func TestGetScreenLinesBlockFrameInvertedOnHeavy(t *testing.T) {
+	color, _ := parseColor("info")
+	m := initialModel("A", font.Get("heavy"), color, border.Block, true, defaultHint, true)
+	m.width = 40
+	m.height = 20
+
+	lines := m.getScreenLines()
+	stripped := make([]string, len(lines))
+	for i, line := range lines {
+		stripped[i] = strings.TrimSpace(stripANSI(line))
+	}
+
+	foundTopLowerAll := false
+	foundBottomUpperAll := false
+	foundLeadingBlank := false
+	for _, line := range stripped {
+		if line == "" {
+			foundLeadingBlank = true
+			continue
+		}
+		if isAllLowerHalf(line) {
+			foundTopLowerAll = true
+		}
+		if isAllUpperHalf(line) {
+			foundBottomUpperAll = true
+		}
+	}
+
+	if !foundLeadingBlank {
+		t.Errorf("expected a blank leading row before the top edge for heavy+block; not found in %v", stripped)
+	}
+	if !foundTopLowerAll {
+		t.Errorf("expected a row made entirely of ▄ (top edge with half-block corners) for heavy+block; not found in %v", stripped)
+	}
+	if !foundBottomUpperAll {
+		t.Errorf("expected a row made entirely of ▀ (bottom edge with half-block corners) for heavy+block; not found in %v", stripped)
+	}
+}
+
+func isAllLowerHalf(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r != '▄' {
+			return false
+		}
+	}
+	return true
+}
+
+func isAllUpperHalf(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r != '▀' {
+			return false
+		}
+	}
+	return true
 }

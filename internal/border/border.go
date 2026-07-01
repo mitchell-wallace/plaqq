@@ -27,6 +27,37 @@ const DefaultName = "none"
 
 var displayOrder = []string{string(None), string(Single), string(Double), string(Block)}
 
+// BlockFrameMode controls how the Block kind renders. It is ignored for every
+// other kind. Different faces benefit from different visual weights: the
+// single-row terminal face and the 3/5-row block faces get a subtle half-block
+// border, while the 7-row heavy face needs an extra leading row and inverted
+// halves to keep the frame from feeling cramped.
+type BlockFrameMode int
+
+const (
+	// BlockFrameSplit is the default Block rendering: the top edge is upper-half
+	// blocks (▀) with full-block corners, the bottom edge is lower-half blocks
+	// (▄) with full-block corners, and the sides are full blocks. Suits the
+	// 1-row terminal face and the 3/5-row block faces.
+	BlockFrameSplit BlockFrameMode = iota
+	// BlockFrameInverted renders the Block frame flipped vertically with a
+	// blank leading row: the top edge is all lower-half blocks (▄), the
+	// bottom edge is all upper-half blocks (▀), and the corners are
+	// half-blocks (matching the row's half). Sides stay as full blocks.
+	// Suits the 7-row heavy face.
+	BlockFrameInverted
+)
+
+func (m BlockFrameMode) String() string {
+	switch m {
+	case BlockFrameSplit:
+		return "split"
+	case BlockFrameInverted:
+		return "inverted"
+	}
+	return ""
+}
+
 type glyphs struct {
 	topLeft, top, topRight          string
 	side                            string
@@ -52,15 +83,34 @@ var glyphsByKind = map[Kind]glyphs{
 		bottom:      "═",
 		bottomRight: "╝",
 	},
-	Block: {
-		topLeft:     "█",
-		top:         "█",
-		topRight:    "█",
-		side:        "█",
-		bottomLeft:  "█",
-		bottom:      "█",
-		bottomRight: "█",
-	},
+}
+
+func glyphsFor(k Kind, mode BlockFrameMode) glyphs {
+	if k != Block {
+		return glyphsByKind[k]
+	}
+	switch mode {
+	case BlockFrameInverted:
+		return glyphs{
+			topLeft:     "▄",
+			top:         "▄",
+			topRight:    "▄",
+			side:        "█",
+			bottomLeft:  "▀",
+			bottom:      "▀",
+			bottomRight: "▀",
+		}
+	default:
+		return glyphs{
+			topLeft:     "█",
+			top:         "▀",
+			topRight:    "█",
+			side:        "█",
+			bottomLeft:  "█",
+			bottom:      "▄",
+			bottomRight: "█",
+		}
+	}
 }
 
 func (k Kind) String() string {
@@ -112,7 +162,7 @@ func suggest(input string) string {
 	return fmt.Sprintf("; did you mean %q?", s)
 }
 
-func (k Kind) Wrap(rows []string, hMargin int) []string {
+func (k Kind) Wrap(rows []string, hMargin int, mode BlockFrameMode) []string {
 	if k == None || len(rows) == 0 {
 		return rows
 	}
@@ -123,7 +173,10 @@ func (k Kind) Wrap(rows []string, hMargin int) []string {
 	}
 
 	g, ok := glyphsByKind[k]
-	if !ok {
+	if k == Block || ok {
+		g = glyphsFor(k, mode)
+	}
+	if g == (glyphs{}) {
 		return rows
 	}
 
@@ -132,7 +185,10 @@ func (k Kind) Wrap(rows []string, hMargin int) []string {
 		padded[i] = padRow(r, inner, hMargin)
 	}
 
-	out := make([]string, 0, len(padded)+2)
+	out := make([]string, 0, len(padded)+3)
+	if k == Block && mode == BlockFrameInverted {
+		out = append(out, strings.Repeat(" ", inner+2))
+	}
 	out = append(out, buildEdge(g.topLeft, g.top, g.topRight, inner))
 	for _, row := range padded {
 		out = append(out, g.side+row+g.side)
