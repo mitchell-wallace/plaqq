@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -854,6 +855,38 @@ func (m *model) Init() tea.Cmd {
 	)
 }
 
+func frameMarginFor(fontName string) int {
+	switch fontName {
+	case "heavy":
+		return 3
+	case "compact", "block", "wide":
+		return 2
+	case "terminal":
+		return 1
+	default:
+		return 2
+	}
+}
+
+func gapRowsFor(f font.Font) int {
+	if _, ok := f.(font.Terminal); ok {
+		return 1
+	}
+	return 2
+}
+
+func fontNameFor(f font.Font) string {
+	if _, ok := f.(font.Terminal); ok {
+		return "terminal"
+	}
+	for _, name := range font.Names() {
+		if font.Get(name) == f {
+			return name
+		}
+	}
+	return font.DefaultName
+}
+
 func (m *model) getScreenLines() []string {
 	if m.width == 0 || m.height == 0 {
 		return nil
@@ -867,38 +900,68 @@ func (m *model) getScreenLines() []string {
 
 	lines := font.Wrap(m.font, m.text, maxWidth)
 
-	noticeStyle := lipgloss.NewStyle().Foreground(m.color).Bold(m.bold)
-
-	// Render each wrapped line as a block and center it. Each line is padded by
-	// one uniform amount so that the rendered block keeps its columns aligned
-	// rather than shearing row by row.
-	var centeredRows []string
+	var rows []string
 	for idx, line := range lines {
 		if idx > 0 {
-			// Blank spacing rows between wrapped lines.
-			centeredRows = append(centeredRows, "", "")
-		}
-
-		rows := m.font.Render(line)
-		lineWidth := 0
-		for _, row := range rows {
-			if w := len([]rune(row)); w > lineWidth {
-				lineWidth = w
+			gap := gapRowsFor(m.font)
+			for i := 0; i < gap; i++ {
+				rows = append(rows, "")
 			}
 		}
-		padding := (m.width - lineWidth) / 2
-		if padding < 0 {
-			padding = 0
-		}
-		leftPad := strings.Repeat(" ", padding)
-
-		for _, row := range rows {
+		for _, row := range m.font.Render(line) {
 			if strings.TrimSpace(row) == "" {
-				centeredRows = append(centeredRows, "")
+				rows = append(rows, "")
 				continue
 			}
-			centeredRows = append(centeredRows, leftPad+noticeStyle.Render(row))
+			rows = append(rows, row)
 		}
+	}
+
+	if m.frame != border.None {
+		fontName := fontNameFor(m.font)
+		overflowing := len(rows) > m.height
+		buffer := 0
+		if overflowing {
+			buffer = 5
+		}
+		framed := m.frame.Wrap(rows, frameMarginFor(fontName))
+		available := m.width - buffer
+		fits := true
+		for _, row := range framed {
+			if utf8.RuneCountInString(row) > available {
+				fits = false
+				break
+			}
+		}
+		inner := 0
+		if len(framed) > 2 {
+			inner = utf8.RuneCountInString(framed[1]) - 2
+		}
+		if fits && inner >= 2 {
+			rows = framed
+		}
+	}
+
+	maxRowWidth := 0
+	for _, row := range rows {
+		if w := utf8.RuneCountInString(row); w > maxRowWidth {
+			maxRowWidth = w
+		}
+	}
+	padding := (m.width - maxRowWidth) / 2
+	if padding < 0 {
+		padding = 0
+	}
+	leftPad := strings.Repeat(" ", padding)
+
+	noticeStyle := lipgloss.NewStyle().Foreground(m.color).Bold(m.bold)
+	var centeredRows []string
+	for _, row := range rows {
+		if strings.TrimSpace(row) == "" {
+			centeredRows = append(centeredRows, "")
+			continue
+		}
+		centeredRows = append(centeredRows, leftPad+noticeStyle.Render(row))
 	}
 
 	showHint := m.showHint && strings.TrimSpace(m.hint) != ""

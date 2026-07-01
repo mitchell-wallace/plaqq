@@ -861,3 +861,170 @@ func TestTUIScrolling(t *testing.T) {
 		t.Errorf("expected view to render scrollbar characters ('░' or '█') in scrollable state")
 	}
 }
+
+func TestFrameMarginFor(t *testing.T) {
+	cases := []struct {
+		fontName string
+		want     int
+	}{
+		{"heavy", 3},
+		{"compact", 2},
+		{"block", 2},
+		{"wide", 2},
+		{"terminal", 1},
+		{"unknown", 2},
+		{"", 2},
+	}
+	for _, c := range cases {
+		if got := frameMarginFor(c.fontName); got != c.want {
+			t.Errorf("frameMarginFor(%q) = %d; want %d", c.fontName, got, c.want)
+		}
+	}
+}
+
+func TestGapRowsFor(t *testing.T) {
+	cases := []struct {
+		name string
+		f    font.Font
+		want int
+	}{
+		{"terminal", font.Terminal{}, 1},
+		{"block", font.Get("block"), 2},
+		{"heavy", font.Get("heavy"), 2},
+		{"compact", font.Get("compact"), 2},
+		{"wide", font.Get("wide"), 2},
+	}
+	for _, c := range cases {
+		if got := gapRowsFor(c.f); got != c.want {
+			t.Errorf("gapRowsFor(%s) = %d; want %d", c.name, got, c.want)
+		}
+	}
+}
+
+func TestGetScreenLinesSingleFrameOnTerminal(t *testing.T) {
+	color, _ := parseColor("info")
+	m := initialModel("hi", font.Terminal{}, color, border.Single, true, defaultHint, true)
+	m.width = 40
+	m.height = 20
+
+	lines := m.getScreenLines()
+	output := strings.Join(lines, "\n")
+
+	for _, ch := range []string{"┌", "│", "└"} {
+		if !strings.Contains(output, ch) {
+			t.Errorf("output missing frame character %q\n%s", ch, output)
+		}
+	}
+	if !strings.Contains(output, "hi") {
+		t.Errorf("output missing message text 'hi'\n%s", output)
+	}
+}
+
+func TestGetScreenLinesFrameDroppedWhenTooNarrow(t *testing.T) {
+	color, _ := parseColor("info")
+	m := initialModel("hi", font.Terminal{}, color, border.Single, true, defaultHint, true)
+	m.width = 4
+	m.height = 10
+
+	lines := m.getScreenLines()
+	output := strings.Join(lines, "\n")
+
+	for _, ch := range []string{"┌", "┐", "└", "┘", "│"} {
+		if strings.Contains(output, ch) {
+			t.Errorf("output contains %q (frame should be dropped when too narrow)\n%s", ch, output)
+		}
+	}
+}
+
+func findFirstNonEmpty(lines []string) int {
+	for i, row := range lines {
+		if strings.TrimSpace(row) != "" {
+			return i
+		}
+	}
+	return -1
+}
+
+func countBlankGap(lines []string, after int) int {
+	blanks := 0
+	for i := after + 1; i < len(lines); i++ {
+		if lines[i] == "" {
+			blanks++
+			continue
+		}
+		break
+	}
+	return blanks
+}
+
+func firstInterBlockGap(lines []string) int {
+	sawContent := false
+	blanks := 0
+	for _, row := range lines {
+		isContent := strings.TrimSpace(row) != ""
+		if isContent {
+			if sawContent && blanks > 0 {
+				return blanks
+			}
+			sawContent = true
+			blanks = 0
+		} else if sawContent {
+			blanks++
+		}
+	}
+	return blanks
+}
+
+func TestGetScreenLinesInterLineGapOneForTerminal(t *testing.T) {
+	color, _ := parseColor("info")
+	m := initialModel("the quick brown fox jumps over the lazy dog", font.Terminal{}, color, border.None, true, defaultHint, true)
+	m.width = 40
+	m.height = 20
+
+	lines := m.getScreenLines()
+	if got := firstInterBlockGap(lines); got != 1 {
+		t.Errorf("inter-line blank gap = %d; want 1 (Terminal font)", got)
+	}
+}
+
+func TestGetScreenLinesInterLineGapTwoForBlock(t *testing.T) {
+	color, _ := parseColor("info")
+	m := initialModel("HI HI HI HI", font.Get("block"), color, border.None, true, defaultHint, true)
+	m.width = 40
+	m.height = 20
+
+	lines := m.getScreenLines()
+	if got := firstInterBlockGap(lines); got != 2 {
+		t.Errorf("inter-line blank gap = %d; want 2 (block font)", got)
+	}
+}
+
+func TestGetScreenLinesScrollbarBufferReserved(t *testing.T) {
+	color, _ := parseColor("info")
+	msg := strings.Repeat("word ", 40)
+	m := initialModel(msg, font.Terminal{}, color, border.Single, true, defaultHint, true)
+	m.width = 40
+	m.height = 5
+
+	lines := m.getScreenLines()
+	if len(lines) <= m.height {
+		t.Fatalf("expected content lines (%d) to exceed height (%d) to force scroll", len(lines), m.height)
+	}
+
+	rightmostCol := -1
+	for _, line := range lines {
+		col := 0
+		for _, r := range line {
+			if r == '│' && col > rightmostCol {
+				rightmostCol = col
+			}
+			col++
+		}
+	}
+	if rightmostCol == -1 {
+		t.Fatal("no frame character found in output; frame was dropped")
+	}
+	if got := m.width - 1 - rightmostCol; got < 3 {
+		t.Errorf("rightmost frame character at column %d; want at least 3 cells from right edge (width %d, gap %d)", rightmostCol, m.width, got)
+	}
+}
