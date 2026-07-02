@@ -461,6 +461,14 @@ func runInteractiveForm(style *styleSettings, initialMessage string) (interactiv
 	// every step (huh only binds Ctrl-C by default).
 	keymap := huh.NewDefaultKeyMap()
 	keymap.Quit = key.NewBinding(key.WithKeys("ctrl+c", "esc"), key.WithHelp("esc/ctrl+c", "quit"))
+	// Open the message in $EDITOR (micro, vim, nano, ...) with Ctrl-G, keeping
+	// huh's default Ctrl-E as a secondary binding. The editor feature is on by
+	// default when ExternalEditor is not disabled.
+	keymap.Text.Editor = key.NewBinding(key.WithKeys("ctrl+g", "ctrl+e"), key.WithHelp("ctrl+g", "open editor"))
+	// Insert a line break inline with Ctrl-Enter (where the terminal reports it
+	// distinctly). alt+enter and ctrl+j remain as universal fallbacks because
+	// some terminals cannot distinguish Ctrl-Enter from plain Enter.
+	keymap.Text.NewLine = key.NewBinding(key.WithKeys("ctrl+enter", "alt+enter", "ctrl+j"), key.WithHelp("ctrl+enter", "new line"))
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -468,7 +476,6 @@ func runInteractiveForm(style *styleSettings, initialMessage string) (interactiv
 				Title("Notice message").
 				Placeholder("e.g. remember to run e2e tests before pushing").
 				Lines(3).
-				ExternalEditor(false).
 				Value(&message).
 				Validate(func(s string) error {
 					if strings.TrimSpace(s) == "" {
@@ -780,9 +787,14 @@ func initialModel(text string, glyphFont font.Font, color lipgloss.TerminalColor
 }
 
 func (m *model) Init() tea.Cmd {
+	// Window titles must not contain control characters; collapse any embedded
+	// line breaks (multiline notices) to spaces so the title stays well-formed.
+	title := strings.ReplaceAll(m.text, "\r\n", " ")
+	title = strings.ReplaceAll(title, "\n", " ")
+	title = strings.ReplaceAll(title, "\r", " ")
 	return tea.Batch(
 		tea.HideCursor,
-		tea.SetWindowTitle(m.text),
+		tea.SetWindowTitle(title),
 	)
 }
 
@@ -836,22 +848,38 @@ func (m *model) getScreenLines() []string {
 		maxWidth = 10
 	}
 
-	lines := font.Wrap(m.font, m.text, maxWidth)
+	// Honor explicit line breaks ('\n') as paragraph boundaries. Each segment
+	// is word-wrapped independently; a gap of gapRowsFor(font) blank rows is
+	// emitted between segments (and between wrapped lines within a segment), so
+	// consecutive newlines stack visually.
+	segments := font.WrapSegments(m.font, m.text, maxWidth)
+	gap := gapRowsFor(m.font)
 
 	var rows []string
-	for idx, line := range lines {
-		if idx > 0 {
-			gap := gapRowsFor(m.font)
-			for i := 0; i < gap; i++ {
-				rows = append(rows, "")
+	for segIdx, wrapped := range segments {
+		if len(wrapped) == 0 {
+			// An empty segment still marks a paragraph boundary (the user typed
+			// an extra newline): emit the inter-segment gap.
+			if segIdx > 0 {
+				for i := 0; i < gap; i++ {
+					rows = append(rows, "")
+				}
 			}
+			continue
 		}
-		for _, row := range m.font.Render(line) {
-			if strings.TrimSpace(row) == "" {
-				rows = append(rows, "")
-				continue
+		for lineIdx, line := range wrapped {
+			if segIdx > 0 || lineIdx > 0 {
+				for i := 0; i < gap; i++ {
+					rows = append(rows, "")
+				}
 			}
-			rows = append(rows, row)
+			for _, row := range m.font.Render(line) {
+				if strings.TrimSpace(row) == "" {
+					rows = append(rows, "")
+					continue
+				}
+				rows = append(rows, row)
+			}
 		}
 	}
 

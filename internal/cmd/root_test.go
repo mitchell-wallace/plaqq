@@ -1053,6 +1053,42 @@ func TestGetScreenLinesInterLineGapTwoForBlock(t *testing.T) {
 	}
 }
 
+// TestGetScreenLinesHonorsExplicitNewlines asserts that an explicit '\n' in
+// the message renders as a paragraph break of gapRowsFor(font) blank rows, and
+// that consecutive newlines ('\n\n') stack so the gap doubles.
+func TestGetScreenLinesHonorsExplicitNewlines(t *testing.T) {
+	color, _ := parseColor("info")
+
+	cases := []struct {
+		name     string
+		f        font.Font
+		msg      string
+		wantGap  int
+		wantGap2 int
+	}{
+		{"terminal single newline", font.Terminal{}, "AAA\nBBB", 1, 2},
+		{"block single newline", font.Get("block"), "AAA\nBBB", 2, 4},
+	}
+	for _, c := range cases {
+		t.Run(c.name+"/one-break", func(t *testing.T) {
+			m := initialModel(c.msg, c.f, color, border.None, true, defaultHint, true)
+			m.width = 200
+			m.height = 40
+			if got := firstInterBlockGap(m.getScreenLines()); got != c.wantGap {
+				t.Errorf("single newline gap = %d; want %d", got, c.wantGap)
+			}
+		})
+		t.Run(c.name+"/two-breaks", func(t *testing.T) {
+			m := initialModel("AAA\n\nBBB", c.f, color, border.None, true, defaultHint, true)
+			m.width = 200
+			m.height = 40
+			if got := firstInterBlockGap(m.getScreenLines()); got != c.wantGap2 {
+				t.Errorf("double newline gap = %d; want %d", got, c.wantGap2)
+			}
+		})
+	}
+}
+
 func TestGetScreenLinesScrollbarBufferReserved(t *testing.T) {
 	color, _ := parseColor("info")
 	msg := strings.Repeat("word ", 40)

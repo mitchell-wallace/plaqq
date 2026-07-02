@@ -122,3 +122,81 @@ func equalSlices(a, b []string) bool {
 	}
 	return true
 }
+
+func TestWrapSegmentsHonorsExplicitNewlines(t *testing.T) {
+	f := Get("block")
+
+	// A single segment with no newlines behaves exactly like Wrap.
+	got := WrapSegments(f, "HELLO WORLD", 200)
+	want := [][]string{{"HELLO WORLD"}}
+	if !equalSegmentSlices(got, want) {
+		t.Errorf("WrapSegments(no newline) = %v; want %v", got, want)
+	}
+
+	// One explicit newline produces two segments.
+	got = WrapSegments(f, "HELLO\nWORLD", 200)
+	want = [][]string{{"HELLO"}, {"WORLD"}}
+	if !equalSegmentSlices(got, want) {
+		t.Errorf("WrapSegments(one newline) = %v; want %v", got, want)
+	}
+
+	// Word wrapping is still applied within each segment.
+	got = WrapSegments(f, "HELLO WORLD\nFOO BAR", 40)
+	want = [][]string{{"HELLO", "WORLD"}, {"FOO", "BAR"}}
+	if !equalSegmentSlices(got, want) {
+		t.Errorf("WrapSegments(wrap within segments) = %v; want %v", got, want)
+	}
+
+	// Consecutive newlines produce empty inner segments so callers can apply
+	// per-segment gap rules and let the gaps stack.
+	got = WrapSegments(f, "A\n\nB", 200)
+	want = [][]string{{"A"}, {}, {"B"}}
+	if !equalSegmentSlices(got, want) {
+		t.Errorf("WrapSegments(blank line) = %v; want %v", got, want)
+	}
+
+	// Trailing newline yields a trailing empty segment.
+	got = WrapSegments(f, "A\n", 200)
+	want = [][]string{{"A"}, {}}
+	if !equalSegmentSlices(got, want) {
+		t.Errorf("WrapSegments(trailing newline) = %v; want %v", got, want)
+	}
+}
+
+func TestWrapSegmentsNormalizesCRLF(t *testing.T) {
+	f := Get("block")
+	// \r\n and bare \r must both be normalized to \n before splitting.
+	got := WrapSegments(f, "A\r\nB\rC", 200)
+	want := [][]string{{"A"}, {"B"}, {"C"}}
+	if !equalSegmentSlices(got, want) {
+		t.Errorf("WrapSegments(CRLF/CR) = %v; want %v", got, want)
+	}
+}
+
+func TestWrapBackwardCompatible(t *testing.T) {
+	f := Get("block")
+	// Wrap (the flattened helper) must not introduce blank lines for newlines:
+	// it just concatenates the per-segment wrapped lines.
+	got := Wrap(f, "HELLO\nWORLD", 200)
+	want := []string{"HELLO", "WORLD"}
+	if !equalSlices(got, want) {
+		t.Errorf("Wrap(newline) = %v; want %v (flattened, no blanks)", got, want)
+	}
+
+	// Empty/blank input yields nothing.
+	if Wrap(f, "\n\n", 200) != nil {
+		t.Errorf("Wrap(newlines only) = %v; want nil", Wrap(f, "\n\n", 200))
+	}
+}
+
+func equalSegmentSlices(a, b [][]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !equalSlices(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
+}

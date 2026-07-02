@@ -73,9 +73,40 @@ func Names() []string {
 }
 
 // Wrap splits text into lines whose rendered width in font f does not exceed
-// maxWidth. It greedily packs whole words, splitting long words with hyphens
-// if they exceed maxWidth on their own.
+// maxWidth. Explicit line breaks ('\n') are honored as segment boundaries:
+// each '\n' starts a new segment that is word-wrapped independently, and the
+// segments are concatenated. Carriage returns ('\r\n' and bare '\r') are
+// normalized to '\n'. An empty input yields no lines.
 func Wrap(f Font, text string, maxWidth int) []string {
+	var out []string
+	for _, seg := range WrapSegments(f, text, maxWidth) {
+		out = append(out, seg...)
+	}
+	return out
+}
+
+// WrapSegments splits text into segments on explicit line breaks ('\n') and
+// word-wraps each segment independently. The outer slice has one entry per
+// '\n'-delimited segment (so consecutive newlines produce empty inner slices),
+// letting callers apply per-segment gap rules. Carriage returns are normalized
+// to '\n' first. An entirely empty/blank input returns nil.
+func WrapSegments(f Font, text string, maxWidth int) [][]string {
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	text = strings.ReplaceAll(text, "\r", "\n")
+	segments := strings.Split(text, "\n")
+	out := make([][]string, 0, len(segments))
+	for _, seg := range segments {
+		out = append(out, wrapSegment(f, seg, maxWidth))
+	}
+	return out
+}
+
+// wrapSegment greedily packs whole words of a single (already '\n'-stripped)
+// segment into lines whose rendered width does not exceed maxWidth, splitting
+// long words with hyphens if they exceed maxWidth on their own. It uses
+// strings.Fields so intra-segment whitespace collapses, matching the legacy
+// single-line wrapping behavior.
+func wrapSegment(f Font, text string, maxWidth int) []string {
 	words := strings.Fields(text)
 	if len(words) == 0 {
 		return nil
