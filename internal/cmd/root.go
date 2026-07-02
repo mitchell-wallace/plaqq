@@ -450,7 +450,7 @@ type interactiveFormResult struct {
 // user can shift+tab back to edit the message. Esc and Ctrl-C abort at any step
 // (returned as huh.ErrUserAborted). Each select is seeded from the fully-resolved
 // style.
-func runInteractiveForm(style styleSettings, initialMessage string) (interactiveFormResult, error) {
+func runInteractiveForm(style *styleSettings, initialMessage string) (interactiveFormResult, error) {
 	message := strings.TrimSpace(initialMessage)
 	confirm := true
 	fontChoice := seedCustomiseFont(style.font)
@@ -593,7 +593,7 @@ optionally wraps the notice in a box-drawing border (none, single, double, block
 			if !interactiveFormAllowed(term.IsTerminal(int(os.Stdin.Fd())), jsonOutput) {
 				exit(1, "a message is required")
 			}
-			res, err := runInteractiveForm(style, "")
+			res, err := runInteractiveForm(&style, "")
 			if err != nil {
 				if errors.Is(err, huh.ErrUserAborted) {
 					// Esc/Ctrl-C at any step: clean exit, no notice.
@@ -661,7 +661,7 @@ optionally wraps the notice in a box-drawing border (none, single, double, block
 			if !interactiveFormAllowed(term.IsTerminal(int(os.Stdin.Fd())), jsonOutput) {
 				exit(1, "cannot edit without an interactive terminal")
 			}
-			res, err := runInteractiveForm(styleSettings{color: renderColor, font: renderFont, frame: renderFrame, bold: style.bold, hint: style.hint, noHint: style.noHint}, noticeMsg)
+			res, err := runInteractiveForm(&styleSettings{color: renderColor, font: renderFont, frame: renderFrame, bold: style.bold, hint: style.hint, noHint: style.noHint}, noticeMsg)
 			if err != nil {
 				if errors.Is(err, huh.ErrUserAborted) {
 					return nil
