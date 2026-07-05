@@ -505,7 +505,14 @@ func runInteractiveForm(style *styleSettings, initialMessage string) (interactiv
 				Options(frameOptions()...).
 				Value(&frameChoice),
 		).WithHideFunc(func() bool { return confirm }),
-	).WithKeyMap(keymap)
+	).
+		WithKeyMap(keymap).
+		WithHeight(9).
+		WithProgramOptions(
+			tea.WithAltScreen(),
+			tea.WithOutput(os.Stderr),
+			tea.WithReportFocus(),
+		)
 
 	if err := form.Run(); err != nil {
 		return interactiveFormResult{}, err
